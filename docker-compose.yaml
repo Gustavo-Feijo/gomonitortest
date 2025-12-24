@@ -1,0 +1,67 @@
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "${REDIS_PORT}:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgresql:
+    image: postgres:latest
+    container_name: postgresql
+    restart: always
+    ports:
+      - "${SQL_PORT}:5432"
+    environment:
+      POSTGRES_USER: ${SQL_USER}
+      POSTGRES_PASSWORD: ${SQL_PASSWORD}
+      POSTGRES_DB: ${SQL_DATABASE}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SQL_USER} -d ${SQL_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: gomonitor-app
+    restart: always
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      - ENVIRONMENT=docker
+      - SQL_HOST=postgresql
+      - SQL_PORT=5432
+      - SQL_USER=${SQL_USER}
+      - SQL_PASSWORD=${SQL_PASSWORD}
+      - SQL_DATABASE=${SQL_DATABASE}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+  
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
