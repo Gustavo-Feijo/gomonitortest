@@ -22,6 +22,9 @@ services:
       POSTGRES_USER: ${SQL_USER}
       POSTGRES_PASSWORD: ${SQL_PASSWORD}
       POSTGRES_DB: ${SQL_DATABASE}
+
+      EXPORTER_USER: ${SQL_EXPORTER_USER}
+      EXPORTER_PASSWORD: ${SQL_EXPORTER_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${SQL_USER} -d ${SQL_DATABASE}"]
       interval: 10s
@@ -29,6 +32,7 @@ services:
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init/init-exporter.sh:/docker-entrypoint-initdb.d/init-exporter.sh
 
   app:
     build: .
@@ -58,6 +62,24 @@ services:
     ports:
       - "9090:9090"
   
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: postgresql://${SQL_EXPORTER_USER}:${SQL_EXPORTER_PASSWORD}@postgresql:5432/${SQL_DATABASE}?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgresql
+
+  redis-exporter:
+    image: oliver006/redis_exporter
+    environment:
+      REDIS_ADDR: "redis:${REDIS_PORT}"
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+
   grafana:
     image: grafana/grafana:latest
     ports:

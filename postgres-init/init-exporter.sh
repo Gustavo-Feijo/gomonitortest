@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$SQL_USER" --dbname "$SQL_DATABASE" <<-EOSQL
+    CREATE USER $EXPORTER_USER WITH PASSWORD '$EXPORTER_PASSWORD';
+    GRANT pg_monitor TO $EXPORTER_USER;
+EOSQL
