@@ -8,6 +8,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 // New opens a gorm connection pool to postgres.
@@ -38,6 +39,11 @@ func New(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	if err := sqlDb.Ping(); err != nil {
 		sqlDb.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	if err := db.Use(tracing.NewPlugin()); err != nil {
+		sqlDb.Close()
+		return nil, fmt.Errorf("failed to use tracing: %w", err)
 	}
 
 	return db, err

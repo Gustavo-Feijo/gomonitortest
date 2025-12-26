@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 // App consists of the engine and address where it will listen.
@@ -38,6 +39,8 @@ func New(cfg *config.Config) (*App, error) {
 
 	prometheus.Init()
 	engine.Use(prometheus.PrometheusMiddleware())
+
+	engine.Use(otelgin.Middleware(cfg.Tracing.ServiceName))
 
 	userHander := user.NewHandler(deps)
 	registerRoutes(engine, userHander)
