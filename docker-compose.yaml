@@ -108,7 +108,7 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter
     environment:
-      REDIS_ADDR: "redis:${REDIS_PORT}"
+      REDIS_ADDR: "redis:6379"
     ports:
       - "9121:9121"
     depends_on:
