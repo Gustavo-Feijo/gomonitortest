@@ -23,7 +23,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error starting Otel setup: %v", err)
 	}
-	defer otelShutdown(ctx)
+	defer func() {
+		if err := otelShutdown(ctx); err != nil {
+			log.Printf("failed to shutdown otel: %v", err)
+		}
+	}()
 
 	server, err := app.New(cfg)
 	if err != nil {

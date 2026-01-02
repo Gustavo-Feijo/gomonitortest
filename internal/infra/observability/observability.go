@@ -14,8 +14,6 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Config struct {
@@ -29,21 +27,11 @@ type Config struct {
 func InitTracer(cfg Config) (func(context.Context) error, error) {
 	ctx := context.Background()
 
-	// Create OTLP exporter
-	conn, err := grpc.DialContext(
-		ctx,
-		cfg.OTLPEndpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
-	}
-
 	exporter, err := otlptrace.New(
 		ctx,
 		otlptracegrpc.NewClient(
-			otlptracegrpc.WithGRPCConn(conn),
+			otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
+			otlptracegrpc.WithInsecure(),
 		),
 	)
 	if err != nil {

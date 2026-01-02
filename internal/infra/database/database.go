@@ -1,6 +1,7 @@
 package databaseinfra
 
 import (
+	"errors"
 	"fmt"
 	"gomonitor/internal/config"
 	"time"
@@ -37,12 +38,18 @@ func New(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 
 	// Test the connection
 	if err := sqlDb.Ping(); err != nil {
-		sqlDb.Close()
+		dbCloseErr := sqlDb.Close()
+		if dbCloseErr != nil {
+			err = errors.Join(err, dbCloseErr)
+		}
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	if err := db.Use(tracing.NewPlugin()); err != nil {
-		sqlDb.Close()
+		dbCloseErr := sqlDb.Close()
+		if dbCloseErr != nil {
+			err = errors.Join(err, dbCloseErr)
+		}
 		return nil, fmt.Errorf("failed to use tracing: %w", err)
 	}
 

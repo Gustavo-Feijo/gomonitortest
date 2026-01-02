@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"errors"
 	"gomonitor/internal/config"
 	"time"
 
@@ -24,7 +25,9 @@ func SetupOtel(ctx context.Context, cfg *config.TracingConfig) (func(context.Con
 		),
 	)
 	if err != nil {
-		traceExporter.Shutdown(ctx)
+		if otelShutdownErr := traceExporter.Shutdown(ctx); otelShutdownErr != nil {
+			err = errors.Join(err, otelShutdownErr)
+		}
 		return nil, err
 	}
 
@@ -35,7 +38,9 @@ func SetupOtel(ctx context.Context, cfg *config.TracingConfig) (func(context.Con
 		),
 	)
 	if err != nil {
-		traceExporter.Shutdown(ctx)
+		if otelShutdownErr := traceExporter.Shutdown(ctx); otelShutdownErr != nil {
+			err = errors.Join(err, otelShutdownErr)
+		}
 		return nil, err
 	}
 

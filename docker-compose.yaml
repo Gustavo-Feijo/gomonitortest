@@ -31,8 +31,8 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres-init/init-exporter.sh:/docker-entrypoint-initdb.d/init-exporter.sh
+      - postgres_data:/var/lib/postgresql
+      - ./deployment/postgres-init/init-exporter.sh:/docker-entrypoint-initdb.d/init-exporter.sh
 
   app:
     build: .
@@ -40,6 +40,8 @@ services:
     restart: always
     ports:
       - "${APP_PORT:-8080}:8080"
+    labels:
+      logging: "enabled"
     env_file:
       - .env
     environment:
@@ -53,7 +55,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./deployment/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
   
@@ -61,13 +63,38 @@ services:
     image: grafana/tempo:latest
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
-      - ./observability/tempo/tempo.yaml:/etc/tempo.yaml
+      - ./deployment/observability/tempo/tempo.yaml:/etc/tempo.yaml
       - tempo_data:/var/tempo
     ports:
       - "3200:3200" # Tempo
       - "9095:9095" # Tempo gRPC
       - "4317:4317" # otlp gRPC 
       - "4318:4318" # otlp http
+      
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./deployment/observability/loki/loki.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+      
+  alloy:
+    image: grafana/alloy:latest
+    ports:
+      - "12345:12345"   
+      - "3500:3500"
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/config.alloy"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./deployment/observability/alloy/config.alloy:/etc/config.alloy
+    depends_on:
+      - loki
   
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
@@ -91,7 +118,11 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    volumes:
+      - ./deployment/observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./deployment/observability/grafana/dashboards:/var/lib/grafana/dashboards
 
 volumes:
+  loki_data:
   postgres_data:
   tempo_data:

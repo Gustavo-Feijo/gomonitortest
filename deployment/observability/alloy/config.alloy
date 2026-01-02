@@ -1,0 +1,58 @@
+// Containers entrypoint, only get containers with logging enabled.
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["logging=enabled"]
+  }
+}
+
+// Add labels to logs based on docker metadata.
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+  
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container_name"
+  }
+  
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "compose_service"
+  }
+}
+
+// Loki entrypoint.
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.process.json_logs.receiver]
+}
+
+// Log processing process.
+loki.process "json_logs" {
+  forward_to = [loki.write.local.receiver]
+  
+  stage.json {
+    expressions = {
+      level     = "level",
+      msg       = "msg",
+      trace_id  = "trace_id",
+      span_id   = "span_id",
+    }
+  }
+  
+  stage.labels {
+    values = {
+      level = "level",
+    }
+  }
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+    batch_wait = "1s"
+  }
+}

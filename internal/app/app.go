@@ -35,7 +35,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	engine := gin.New()
-	engine.Use(gin.Recovery(), gin.Logger())
+	engine.Use(gin.Recovery())
 
 	prometheus.Init()
 	engine.Use(prometheus.PrometheusMiddleware())
