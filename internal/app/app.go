@@ -4,8 +4,12 @@ import (
 	"gomonitor/internal/config"
 	databaseinfra "gomonitor/internal/infra/database"
 	"gomonitor/internal/infra/deps"
+	"gomonitor/internal/observability/logging"
 	"gomonitor/internal/observability/prometheus"
+	"gomonitor/internal/observability/tracing"
 	"gomonitor/internal/user"
+	"net/http"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -25,6 +29,8 @@ type RouteRegister interface {
 
 // New returns a new app.
 func New(cfg *config.Config) (*App, error) {
+	logger := logging.New(cfg)
+
 	deps, err := deps.NewDeps(cfg)
 	if err != nil {
 		return nil, err
@@ -37,10 +43,26 @@ func New(cfg *config.Config) (*App, error) {
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 
+	// Setup prometheus middleware.
 	prometheus.Init()
 	engine.Use(prometheus.PrometheusMiddleware())
 
-	engine.Use(otelgin.Middleware(cfg.Tracing.ServiceName))
+	// Setup tracing middleware.
+	tracingMiddleware := otelgin.Middleware(cfg.Tracing.ServiceName,
+		otelgin.WithFilter(func(r *http.Request) bool {
+			return !slices.Contains(tracing.IgnoredRoutes, r.URL.Path)
+		}),
+	)
+	engine.Use(tracingMiddleware)
+
+	// Setup logging to store trace and span ids..
+	engine.Use(
+		func(c *gin.Context) {
+			ctxLogger := logging.WithTrace(c.Request.Context(), logger)
+			c.Set("logger", ctxLogger)
+			c.Next()
+		},
+	)
 
 	userHander := user.NewHandler(deps)
 	registerRoutes(engine, userHander)

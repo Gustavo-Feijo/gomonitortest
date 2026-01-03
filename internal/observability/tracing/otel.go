@@ -15,6 +15,11 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
+var IgnoredRoutes = []string{
+	"/health",
+	"/metrics",
+}
+
 // SetupOtel starts the Otel.
 func SetupOtel(ctx context.Context, cfg *config.TracingConfig) (func(context.Context) error, error) {
 	traceExporter, err := otlptrace.New(

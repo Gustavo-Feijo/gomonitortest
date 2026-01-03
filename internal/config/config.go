@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Database *DatabaseConfig
 	HTTP     *HTTPConfig
+	Logging  *LoggingConfig
 	Redis    *RedisConfig
 	Tracing  *TracingConfig
 }
@@ -24,6 +25,7 @@ func Load() (*Config, error) {
 	return &Config{
 		Database: getDatabaseConfig(),
 		HTTP:     getHTTPConfig(),
+		Logging:  getLoggingConfig(),
 		Redis:    getRedisConfig(),
 		Tracing:  getTracingConfig(),
 	}, nil

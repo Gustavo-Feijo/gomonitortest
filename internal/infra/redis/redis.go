@@ -20,12 +20,12 @@ func New(cfg *config.RedisConfig) *redis.Client {
 		PoolTimeout:  cfg.PoolTimeout,
 	})
 
-	if err := redisotel.InstrumentTracing(client); err != nil {
+	if err := redisotel.InstrumentTracing(
+		client,
+		redisotel.WithCommandFilter(redisotel.DefaultCommandFilter),
+		redisotel.WithDialFilter(true),
+	); err != nil {
 		log.Printf("Error while adding redis tracing: %v", err)
-	}
-
-	if err := redisotel.InstrumentMetrics(client); err != nil {
-		log.Printf("Error while adding redis metrics: %v", err)
 	}
 
 	return client

@@ -36,7 +36,7 @@ func (h *Handler) create(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.CreateUser(req.Name)
+	user, err := h.service.CreateUser(c.Request.Context(), req.Name)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -52,7 +52,7 @@ func (h *Handler) getByID(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.GetUser(uint(id))
+	user, err := h.service.GetUser(c.Request.Context(), uint(id))
 	if err != nil {
 		c.Status(http.StatusNotFound)
 		return
