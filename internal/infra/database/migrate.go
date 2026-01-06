@@ -1,6 +1,7 @@
 package databaseinfra
 
 import (
+	"context"
 	"fmt"
 	"gomonitor/internal/config"
 
@@ -11,7 +12,11 @@ import (
 )
 
 // RunMigrations applies all pending migrations to the database.
-func RunMigrations(cfg *config.DatabaseConfig, db *gorm.DB) error {
+func RunMigrations(ctx context.Context, cfg *config.DatabaseConfig, db *gorm.DB) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	sqlDb, err := db.DB()
 	if err != nil {
 		return fmt.Errorf("error getting the sql.DB: %w", err)

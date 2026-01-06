@@ -11,12 +11,12 @@ import (
 )
 
 // New creates a new structured logger.
-func New(cfg *config.Config) *slog.Logger {
+func New(cfg *config.LoggingConfig) *slog.Logger {
 	var handler slog.Handler
 
 	opts := &slog.HandlerOptions{
-		Level:     parseLevel(cfg.Logging.Level),
-		AddSource: cfg.Logging.Level == "debug",
+		Level:     parseLevel(cfg.Level),
+		AddSource: cfg.Level == "debug",
 	}
 
 	handler = slog.NewJSONHandler(os.Stdout, opts)

@@ -1,13 +1,17 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"gomonitor/internal/config"
+	"gomonitor/internal/domain/auth"
+	"gomonitor/internal/domain/user"
 	databaseinfra "gomonitor/internal/infra/database"
 	"gomonitor/internal/infra/deps"
 	"gomonitor/internal/observability/logging"
 	"gomonitor/internal/observability/prometheus"
 	"gomonitor/internal/observability/tracing"
-	"gomonitor/internal/user"
+	"log/slog"
 	"net/http"
 	"slices"
 
@@ -28,16 +32,18 @@ type RouteRegister interface {
 }
 
 // New returns a new app.
-func New(cfg *config.Config) (*App, error) {
-	logger := logging.New(cfg)
-
-	deps, err := deps.NewDeps(cfg)
+func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, error) {
+	deps, err := deps.NewDeps(ctx, cfg, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error initializing dependencies: %v", err)
 	}
 
-	if err := databaseinfra.RunMigrations(cfg.Database, deps.DB); err != nil {
-		return nil, err
+	if err := databaseinfra.RunMigrations(ctx, cfg.Database, deps.DB); err != nil {
+		return nil, fmt.Errorf("error running migrations: %v", err)
+	}
+
+	if err = bootstrapApp(ctx, cfg, deps); err != nil {
+		logger.Error("error bootstrapping application", slog.Any("err", err))
 	}
 
 	engine := gin.New()
@@ -58,14 +64,16 @@ func New(cfg *config.Config) (*App, error) {
 	// Setup logging to store trace and span ids..
 	engine.Use(
 		func(c *gin.Context) {
-			ctxLogger := logging.WithTrace(c.Request.Context(), logger)
+			ctxLogger := logging.WithTrace(c.Request.Context(), deps.Logger)
 			c.Set("logger", ctxLogger)
 			c.Next()
 		},
 	)
 
-	userHander := user.NewHandler(deps)
-	registerRoutes(engine, userHander)
+	userHandler := user.NewHandler(deps)
+	authHandler := auth.NewHandler(deps, cfg.Auth)
+
+	registerRoutes(engine, userHandler, authHandler)
 
 	return &App{
 		Engine: engine,

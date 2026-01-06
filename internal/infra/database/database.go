@@ -1,6 +1,7 @@
 package databaseinfra
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"gomonitor/internal/config"
@@ -13,7 +14,7 @@ import (
 )
 
 // New opens a gorm connection pool to postgres.
-func New(cfg *config.DatabaseConfig) (*gorm.DB, error) {
+func New(ctx context.Context, cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	// Create the database instance.
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -37,7 +38,7 @@ func New(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	sqlDb.SetConnMaxIdleTime(time.Hour)
 
 	// Test the connection
-	if err := sqlDb.Ping(); err != nil {
+	if err := sqlDb.PingContext(ctx); err != nil {
 		dbCloseErr := sqlDb.Close()
 		if dbCloseErr != nil {
 			err = errors.Join(err, dbCloseErr)

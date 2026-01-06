@@ -4,8 +4,10 @@ import (
 	"context"
 	"gomonitor/internal/app"
 	"gomonitor/internal/config"
+	"gomonitor/internal/observability/logging"
 	"gomonitor/internal/observability/tracing"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 )
@@ -19,21 +21,27 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
+	logger := logging.New(cfg.Logging)
+
 	otelShutdown, err := tracing.SetupOtel(ctx, cfg.Tracing)
 	if err != nil {
-		log.Fatalf("Error starting Otel setup: %v", err)
+		logger.Error("failed to startup otel", slog.Any("err", err))
+		return
 	}
 	defer func() {
 		if err := otelShutdown(ctx); err != nil {
-			log.Printf("failed to shutdown otel: %v", err)
+			logger.Error("failed to shutdown otel", slog.Any("err", err))
 		}
 	}()
 
-	server, err := app.New(cfg)
+	server, err := app.New(ctx, cfg, logger)
 	if err != nil {
-		log.Fatalf("Error starting deps: %v", err)
+		logger.Error("failed to initialize app", slog.Any("err", err))
+		return
 	}
 
-	log.Printf("Starting server on: %s", server.Addr)
-	log.Fatal(server.Engine.Run(server.Addr))
+	logger.Info("starting server", slog.String("addr", server.Addr))
+	if err := server.Engine.Run(server.Addr); err != nil {
+		logger.Error("server stopped", slog.Any("err", err))
+	}
 }

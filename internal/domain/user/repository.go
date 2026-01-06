@@ -6,12 +6,26 @@ import (
 	"gorm.io/gorm"
 )
 
+type Repository interface {
+	Count(ctx context.Context) (int64, error)
+	Create(ctx context.Context, user *User) error
+}
+
 type repository struct {
 	db *gorm.DB
 }
 
-func newRepository(db *gorm.DB) *repository {
+func NewRepository(db *gorm.DB) *repository {
 	return &repository{db}
+}
+
+func (r *repository) Count(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.Model(&User{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (r *repository) Create(ctx context.Context, user *User) error {

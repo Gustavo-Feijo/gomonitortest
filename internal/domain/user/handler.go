@@ -2,23 +2,32 @@ package user
 
 import (
 	"gomonitor/internal/infra/deps"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
+type handler struct {
+	logger  *slog.Logger
 	service *service
 }
 
-func NewHandler(deps *deps.Deps) *Handler {
-	repo := newRepository(deps.DB)
-	svc := newService(repo)
-	return &Handler{service: svc}
+func NewHandler(deps *deps.Deps) *handler {
+	svcDeps := &ServiceDeps{
+		Logger: deps.Logger,
+		DB:     deps.DB,
+	}
+	svc := NewService(svcDeps)
+
+	return &handler{
+		logger:  deps.Logger,
+		service: svc,
+	}
 }
 
-func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
+func (h *handler) RegisterRoutes(r *gin.RouterGroup) {
 	users := r.Group("/users")
 	{
 		users.POST("", h.create)
@@ -26,17 +35,15 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	}
 }
 
-func (h *Handler) create(c *gin.Context) {
-	var req struct {
-		Name string `json:"name"`
-	}
+func (h *handler) create(c *gin.Context) {
+	var req CreateUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	user, err := h.service.CreateUser(c.Request.Context(), req.Name)
+	user, err := h.service.CreateUser(c.Request.Context(), req)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -45,7 +52,7 @@ func (h *Handler) create(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-func (h *Handler) getByID(c *gin.Context) {
+func (h *handler) getByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.Status(http.StatusBadRequest)

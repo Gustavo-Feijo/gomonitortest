@@ -9,6 +9,8 @@ import (
 )
 
 type Config struct {
+	Admin    *AdminConfig
+	Auth     *AuthConfig
 	Database *DatabaseConfig
 	HTTP     *HTTPConfig
 	Logging  *LoggingConfig
@@ -22,7 +24,19 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	adminConfig, err := getAdminConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	authConfig, err := getAuthConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
+		Admin:    adminConfig,
+		Auth:     authConfig,
 		Database: getDatabaseConfig(),
 		HTTP:     getHTTPConfig(),
 		Logging:  getLoggingConfig(),
