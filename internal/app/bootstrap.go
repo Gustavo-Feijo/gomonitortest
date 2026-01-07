@@ -50,8 +50,8 @@ func createAdminUser(ctx context.Context, cfg *config.AdminConfig, db *gorm.DB, 
 
 	internalCtx := identity.WithPrincipal(ctx, principal)
 
-	var role identity.UserRole = identity.RoleAdmin
-	adminUser := user.CreateUserRequest{
+	var role = identity.RoleAdmin
+	adminUser := user.CreateUserInput{
 		Name:     "admin",
 		UserName: "admin",
 		Email:    cfg.Email,

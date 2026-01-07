@@ -17,31 +17,31 @@ type ServiceDeps struct {
 	Logger     *slog.Logger
 }
 
-type service struct {
+type Service struct {
 	authCfg *config.AuthConfig
 	logger  *slog.Logger
 	repo    Repository
 }
 
-func NewService(deps *ServiceDeps) *service {
+func NewService(deps *ServiceDeps) *Service {
 	repo := NewRepository(deps.DB)
 
-	return &service{
+	return &Service{
 		authCfg: deps.AuthConfig,
 		logger:  deps.Logger,
 		repo:    repo,
 	}
 }
 
-func (s *service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
-	user, err := s.repo.GetUserByEmail(ctx, req.Email)
+func (s *Service) Login(ctx context.Context, input LoginInput) (*LoginOutput, error) {
+	user, err := s.repo.GetUserByEmail(ctx, input.Email)
 
 	hash := s.authCfg.FakeHash
 	if err == nil && user != nil {
 		hash = user.Password
 	}
 
-	verifyErr := password.VerifyPassword(hash, req.Password)
+	verifyErr := password.VerifyPassword(hash, input.Password)
 
 	if err != nil || user == nil || verifyErr != nil {
 		return nil, ErrInvalidCredentials
@@ -78,14 +78,14 @@ func (s *service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, ErrInvalidCredentials
 	}
 
-	return &LoginResponse{
+	return &LoginOutput{
 		RefreshToken: refreshTokenStr,
 		ApiToken:     apiTokenStr,
 	}, nil
 }
 
-func (s *service) Refresh(ctx context.Context, req RefreshRequest) (*RefreshResponse, error) {
-	token, err := jwt.Parse(req.RefreshToken, func(t *jwt.Token) (any, error) {
+func (s *Service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutput, error) {
+	token, err := jwt.Parse(input.RefreshToken, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
@@ -137,7 +137,7 @@ func (s *service) Refresh(ctx context.Context, req RefreshRequest) (*RefreshResp
 		return nil, ErrInvalidToken
 	}
 
-	return &RefreshResponse{
+	return &RefreshOutput{
 		ApiToken: accessToken,
 	}, nil
 }

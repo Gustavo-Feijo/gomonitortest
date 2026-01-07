@@ -15,21 +15,21 @@ type ServiceDeps struct {
 	DB     *gorm.DB
 }
 
-type service struct {
+type Service struct {
 	logger *slog.Logger
 	repo   *repository
 }
 
-func NewService(deps *ServiceDeps) *service {
+func NewService(deps *ServiceDeps) *Service {
 	repo := NewRepository(deps.DB)
 
-	return &service{
+	return &Service{
 		logger: deps.Logger,
 		repo:   repo,
 	}
 }
 
-func (s *service) CreateUser(ctx context.Context, req CreateUserRequest) (*CreateUserResponse, error) {
+func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
 	principal, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
 		return nil, errors.ErrUnauthenticated
@@ -40,21 +40,21 @@ func (s *service) CreateUser(ctx context.Context, req CreateUserRequest) (*Creat
 	}
 
 	var role identity.UserRole
-	if req.Role != nil {
-		role = *req.Role
+	if input.Role != nil {
+		role = *input.Role
 	} else {
 		role = identity.RoleUser
 	}
 
-	hashedPassword, err := password.HashPassword(req.Password)
+	hashedPassword, err := password.HashPassword(input.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	user := &User{
-		Name:     req.Name,
-		UserName: req.UserName,
-		Email:    req.Email,
+		Name:     input.Name,
+		UserName: input.UserName,
+		Email:    input.Email,
 		Password: hashedPassword,
 		Role:     role,
 	}
@@ -71,39 +71,18 @@ func (s *service) CreateUser(ctx context.Context, req CreateUserRequest) (*Creat
 
 	s.logger.Info("user created",
 		"created_by", principal.UserID,
-		"target_email", req.Email,
+		"target_email", input.Email,
 		"source", principal.Source,
 	)
 
-	resp := &CreateUserResponse{
-		ID:    user.ID,
-		Email: user.Email,
-		Name:  user.Name,
-		Role:  user.Role,
-
-		CreatedAt: user.CreatedAt,
-		UserName:  user.UserName,
-	}
-
-	return resp, nil
+	return user, nil
 }
 
-func (s *service) GetUser(ctx context.Context, id uint) (*GetUserResponse, error) {
-	user, err := s.repo.FindByID(ctx, id)
+func (s *Service) GetUser(ctx context.Context, input GetUserInput) (*User, error) {
+	user, err := s.repo.FindByID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &GetUserResponse{
-		ID:       user.ID,
-		Email:    user.Email,
-		Name:     user.Name,
-		Role:     user.Role,
-		UserName: user.UserName,
-
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
-	return resp, nil
+	return user, nil
 }

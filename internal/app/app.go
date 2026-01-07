@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	authhandler "gomonitor/internal/api/handlers/auth"
+	userhandler "gomonitor/internal/api/handlers/user"
 	"gomonitor/internal/config"
-	"gomonitor/internal/domain/auth"
-	"gomonitor/internal/domain/user"
 	databaseinfra "gomonitor/internal/infra/database"
 	"gomonitor/internal/infra/deps"
 	"gomonitor/internal/observability/logging"
@@ -70,8 +70,8 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		},
 	)
 
-	userHandler := user.NewHandler(deps)
-	authHandler := auth.NewHandler(deps, cfg.Auth)
+	userHandler := userhandler.NewHandler(deps)
+	authHandler := authhandler.NewHandler(deps, cfg.Auth)
 
 	registerRoutes(engine, userHandler, authHandler)
 
