@@ -26,7 +26,7 @@ func NewDeps(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Dep
 	}
 
 	// Treat redis connection. Redis is optional for full functionality.
-	rdb, err := redisinfra.New(ctx, cfg.Redis)
+	rdb, err := redisinfra.New(ctx, cfg.Redis, logger)
 	if err != nil {
 		logger.Error("failed to initialize redis connection", slog.Any("err", err))
 	}

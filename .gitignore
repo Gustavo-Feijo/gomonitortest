@@ -1,2 +1,4 @@
 .env
 .vscode
+.scannerwork
+sonar-project.properties

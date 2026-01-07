@@ -14,7 +14,9 @@ RUN go mod download
 RUN go mod verify
 
 # Copy source code
-COPY . .
+COPY cmd ./cmd
+COPY internal ./internal
+COPY migrations ./migrations
 
 # Build the application
 # CGO_ENABLED=0 for static binary
