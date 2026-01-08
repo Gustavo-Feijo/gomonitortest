@@ -18,6 +18,9 @@ func main() {
 	shutdownSignalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	ctx, cancel := context.WithCancel(shutdownSignalCtx)
+	defer cancel()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
@@ -51,15 +54,23 @@ func main() {
 		Handler: engine.Engine,
 	}
 
+	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("starting server", slog.String("addr", server.Addr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("server stopped", slog.Any("err", err))
+			errCh <- err
 		}
 	}()
 
-	<-shutdownSignalCtx.Done()
-	stop()
+	select {
+	case <-ctx.Done():
+		logger.Info("shutdown signal received")
+
+	case err := <-errCh:
+		logger.Error("server stopped unexpectedly", slog.Any("err", err))
+		cancel()
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

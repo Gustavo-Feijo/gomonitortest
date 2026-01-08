@@ -5,19 +5,14 @@ import (
 	"fmt"
 	authhandler "gomonitor/internal/api/handlers/auth"
 	userhandler "gomonitor/internal/api/handlers/user"
+	"gomonitor/internal/api/middlewares"
 	"gomonitor/internal/config"
 	databaseinfra "gomonitor/internal/infra/database"
 	"gomonitor/internal/infra/deps"
-	"gomonitor/internal/observability/logging"
-	"gomonitor/internal/observability/prometheus"
-	"gomonitor/internal/observability/tracing"
 	"log/slog"
-	"net/http"
-	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 // App consists of the engine and address where it will listen.
@@ -47,28 +42,13 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 	}
 
 	engine := gin.New()
+
+	// Add middlewares.
 	engine.Use(gin.Recovery())
-
-	// Setup prometheus middleware.
-	prometheus.Init()
-	engine.Use(prometheus.PrometheusMiddleware())
-
-	// Setup tracing middleware.
-	tracingMiddleware := otelgin.Middleware(cfg.Tracing.ServiceName,
-		otelgin.WithFilter(func(r *http.Request) bool {
-			return !slices.Contains(tracing.IgnoredRoutes, r.URL.Path)
-		}),
-	)
-	engine.Use(tracingMiddleware)
-
-	// Setup logging to store trace and span ids..
-	engine.Use(
-		func(c *gin.Context) {
-			ctxLogger := logging.WithTrace(c.Request.Context(), deps.Logger)
-			c.Set("logger", ctxLogger)
-			c.Next()
-		},
-	)
+	engine.Use(middlewares.TracingMiddleware(cfg))
+	engine.Use(middlewares.LoggingMiddleware(deps))
+	engine.Use(middlewares.ErrorMiddleware())
+	engine.Use(middlewares.PrometheusMiddleware())
 
 	userHandler := userhandler.NewHandler(deps)
 	authHandler := authhandler.NewHandler(deps, cfg.Auth)

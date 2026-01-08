@@ -6,9 +6,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/trace"
 )
+
+type contextKey string
+
+const loggerKey contextKey = "logger"
 
 // New creates a new structured logger.
 func New(cfg *config.LoggingConfig) *slog.Logger {
@@ -22,6 +25,10 @@ func New(cfg *config.LoggingConfig) *slog.Logger {
 	handler = slog.NewJSONHandler(os.Stdout, opts)
 
 	return slog.New(handler)
+}
+
+func WithContext(ctx context.Context, logger *slog.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey, logger)
 }
 
 // WithTrace adds a trace/span id to the logger.
@@ -38,11 +45,9 @@ func WithTrace(ctx context.Context, logger *slog.Logger) *slog.Logger {
 }
 
 // FromContext is a helper to extract the logger from the Gin context.
-func FromContext(c *gin.Context) *slog.Logger {
-	if l, exists := c.Get("logger"); exists {
-		if logger, ok := l.(*slog.Logger); ok && logger != nil {
-			return logger
-		}
+func FromContext(ctx context.Context) *slog.Logger {
+	if logger, ok := ctx.Value(loggerKey).(*slog.Logger); ok && logger != nil {
+		return logger
 	}
 	return slog.Default()
 }

@@ -6,6 +6,7 @@ import (
 	"gomonitor/internal/config"
 	databaseinfra "gomonitor/internal/infra/database"
 	redisinfra "gomonitor/internal/infra/redis"
+	"gomonitor/internal/pkg/jwt"
 	"log/slog"
 
 	"gorm.io/gorm"
@@ -13,9 +14,10 @@ import (
 
 // Dependencies for the service.
 type Deps struct {
-	DB     *gorm.DB
-	Logger *slog.Logger
-	Redis  *redisinfra.RedisClient
+	DB           *gorm.DB
+	Logger       *slog.Logger
+	Redis        *redisinfra.RedisClient
+	TokenManager *jwt.TokenManager
 }
 
 // NewDeps creates the necessary instances.
@@ -32,8 +34,9 @@ func NewDeps(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Dep
 	}
 
 	return &Deps{
-		DB:     db,
-		Logger: logger,
-		Redis:  rdb,
+		DB:           db,
+		Logger:       logger,
+		Redis:        rdb,
+		TokenManager: jwt.NewTokenManager(cfg.Auth),
 	}, nil
 }

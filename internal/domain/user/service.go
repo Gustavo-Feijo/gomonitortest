@@ -2,11 +2,15 @@ package user
 
 import (
 	"context"
-	"gomonitor/internal/pkg/errors"
+	"errors"
+	"gomonitor/internal/infra/database/postgres"
+	"gomonitor/internal/observability/logging"
+	pkgerrors "gomonitor/internal/pkg/errors"
 	"gomonitor/internal/pkg/identity"
 	"gomonitor/internal/pkg/password"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -32,11 +36,17 @@ func NewService(deps *ServiceDeps) *Service {
 func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
 	principal, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
-		return nil, errors.ErrUnauthenticated
+		logging.FromContext(ctx).Warn("unauthenticated user creation attempt")
+		return nil, pkgerrors.NewUnauthorizedError("unauthenticated")
 	}
 
 	if principal.Role != identity.RoleAdmin {
-		return nil, errors.ErrForbidden
+		logging.FromContext(ctx).Warn("unauthorized user creation attempt",
+			"user_id", principal.UserID,
+			"user_role", principal.Role,
+			"source", principal.Source,
+		)
+		return nil, pkgerrors.NewForbiddenError()
 	}
 
 	var role identity.UserRole
@@ -61,15 +71,21 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User,
 
 	err = s.repo.Create(ctx, user)
 	if err != nil {
-		s.logger.Error("failed to create user",
+		logging.FromContext(ctx).Error("failed to create user",
 			"created_by", principal.UserID,
 			"email", user.Email,
 			"error", err,
 		)
+
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == postgres.UniqueViolation {
+			return nil, pkgerrors.NewConflictError("Duplicate entry", err)
+		}
+
 		return nil, err
 	}
 
-	s.logger.Info("user created",
+	logging.FromContext(ctx).Info("user created",
 		"created_by", principal.UserID,
 		"target_email", input.Email,
 		"source", principal.Source,
@@ -81,6 +97,9 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User,
 func (s *Service) GetUser(ctx context.Context, input GetUserInput) (*User, error) {
 	user, err := s.repo.FindByID(ctx, input.ID)
 	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, pkgerrors.NewNotFoundError("User not found", err)
+		}
 		return nil, err
 	}
 

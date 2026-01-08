@@ -13,11 +13,11 @@ func (r *RefreshRequest) ToDomainInput() auth.RefreshInput {
 }
 
 type RefreshResponse struct {
-	ApiToken string `json:"token"`
+	AccessToken string `json:"token"`
 }
 
 func ToRefreshResponse(output *auth.RefreshOutput) *RefreshResponse {
 	return &RefreshResponse{
-		ApiToken: output.ApiToken,
+		AccessToken: output.AccessToken,
 	}
 }

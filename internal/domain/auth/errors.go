@@ -1,8 +1,6 @@
 package auth
 
-import "errors"
-
 var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrInvalidToken       = errors.New("invalid token")
+	MsgInvalidCredentials = "invalid credentials"
+	MsgInvalidToken       = "invalid token"
 )

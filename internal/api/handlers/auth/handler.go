@@ -16,9 +16,10 @@ type Handler struct {
 
 func NewHandler(deps *deps.Deps, authCfg *config.AuthConfig) *Handler {
 	svcDeps := &auth.ServiceDeps{
-		AuthConfig: authCfg,
-		DB:         deps.DB,
-		Logger:     deps.Logger,
+		AuthConfig:   authCfg,
+		DB:           deps.DB,
+		Logger:       deps.Logger,
+		TokenManager: deps.TokenManager,
 	}
 	svc := auth.NewService(svcDeps)
 

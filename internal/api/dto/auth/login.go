@@ -16,12 +16,12 @@ func (r *LoginRequest) ToDomainInput() auth.LoginInput {
 
 type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
-	ApiToken     string `json:"token"`
+	AccessToken  string `json:"token"`
 }
 
 func ToLoginResponse(output *auth.LoginOutput) *LoginResponse {
 	return &LoginResponse{
-		ApiToken:     output.ApiToken,
+		AccessToken:  output.AccessToken,
 		RefreshToken: output.RefreshToken,
 	}
 }

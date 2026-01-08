@@ -19,7 +19,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 	refresh, err := h.service.Refresh(c.Request.Context(), input)
 	if err != nil {
-		c.Status(http.StatusUnauthorized)
+		_ = c.Error(err)
 		return
 	}
 

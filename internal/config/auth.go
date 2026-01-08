@@ -1,23 +1,29 @@
 package config
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 // App auth configuration.
 type AuthConfig struct {
-	ApiTokenSecret     string
+	AccessTokenSecret  string
+	AccessTokenTTL     time.Duration
 	FakeHash           string
 	RefreshTokenSecret string
+	RefreshTokenTTL    time.Duration
 }
 
 func getAuthConfig() (*AuthConfig, error) {
-	apiTokenSecret := getEnv("AUTH_API_TOKEN_SECRET", "")
+	AccessTokenSecret := getEnv("AUTH_ACCESS_TOKEN_SECRET", "")
 	refreshTokenSecret := getEnv("AUTH_REFRESH_TOKEN_SECRET", "")
 
 	// Fake hash to use when user doesn't exist.
 	fakeHash := getEnv("AUTH_FAKE_HASH", "")
 
-	if apiTokenSecret == "" {
-		return nil, errors.New("missing AUTH_API_TOKEN_SECRET")
+	if AccessTokenSecret == "" {
+		return nil, errors.New("missing AUTH_ACCESS_TOKEN_SECRET")
 	}
 
 	if refreshTokenSecret == "" {
@@ -28,9 +34,24 @@ func getAuthConfig() (*AuthConfig, error) {
 		return nil, errors.New("missing AUTH_FAKE_HASH")
 	}
 
+	AccessTokenTTL := getEnv("AUTH_ACCESS_TOKEN_TTL", "1h")
+	refreshTokenTTL := getEnv("AUTH_REFRESH_TOKEN_TTL", "168h")
+
+	accessTokenDuration, err := time.ParseDuration(AccessTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing AccessTokenTTL: %v", err)
+	}
+
+	refreshTokenDuration, err := time.ParseDuration(refreshTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing refreshTokenTTL: %v", err)
+	}
+
 	return &AuthConfig{
-		ApiTokenSecret:     apiTokenSecret,
+		AccessTokenSecret:  AccessTokenSecret,
+		AccessTokenTTL:     accessTokenDuration,
 		FakeHash:           fakeHash,
 		RefreshTokenSecret: refreshTokenSecret,
+		RefreshTokenTTL:    refreshTokenDuration,
 	}, nil
 }

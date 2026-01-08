@@ -1,16 +1,17 @@
 package userhandler
 
 import (
+	"gomonitor/internal/api/middlewares"
 	"gomonitor/internal/domain/user"
 	"gomonitor/internal/infra/deps"
-	"log/slog"
+	"gomonitor/internal/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	logger  *slog.Logger
-	service *user.Service
+	service      *user.Service
+	tokenManager *jwt.TokenManager
 }
 
 func NewHandler(deps *deps.Deps) *Handler {
@@ -21,13 +22,13 @@ func NewHandler(deps *deps.Deps) *Handler {
 	svc := user.NewService(svcDeps)
 
 	return &Handler{
-		logger:  deps.Logger,
-		service: svc,
+		service:      svc,
+		tokenManager: deps.TokenManager,
 	}
 }
 
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
-	users := r.Group("/users")
+	users := r.Group("/users", middlewares.AuthMiddleware(h.tokenManager))
 	{
 		users.POST("", h.create)
 		users.GET("/:id", h.getByID)

@@ -2,9 +2,9 @@ package auth
 
 type LoginOutput struct {
 	RefreshToken string
-	ApiToken     string
+	AccessToken  string
 }
 
 type RefreshOutput struct {
-	ApiToken string
+	AccessToken string
 }
