@@ -2,4 +2,5 @@
 .local.env
 .vscode
 .scannerwork
+coverage.out
 sonar-project.properties

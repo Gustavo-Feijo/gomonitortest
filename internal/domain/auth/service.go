@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"gomonitor/internal/config"
+	"gomonitor/internal/domain/user"
 	"gomonitor/internal/observability/logging"
 	pkgerrors "gomonitor/internal/pkg/errors"
 	"gomonitor/internal/pkg/jwt"
@@ -14,38 +16,42 @@ import (
 
 type ServiceDeps struct {
 	AuthConfig   *config.AuthConfig
-	DB           *gorm.DB
+	UserRepo     user.Repository
 	Logger       *slog.Logger
-	TokenManager *jwt.TokenManager
+	Hasher       password.PasswordHasher
+	TokenManager jwt.TokenManager
 }
 
 type Service struct {
 	authCfg      *config.AuthConfig
 	logger       *slog.Logger
-	repo         Repository
-	tokenManager *jwt.TokenManager
+	hasher       password.PasswordHasher
+	userRepo     user.Repository
+	tokenManager jwt.TokenManager
 }
 
 func NewService(deps *ServiceDeps) *Service {
-	repo := NewRepository(deps.DB)
-
 	return &Service{
 		authCfg:      deps.AuthConfig,
 		logger:       deps.Logger,
-		repo:         repo,
+		hasher:       deps.Hasher,
+		userRepo:     deps.UserRepo,
 		tokenManager: deps.TokenManager,
 	}
 }
 
 func (s *Service) Login(ctx context.Context, input LoginInput) (*LoginOutput, error) {
-	user, err := s.repo.GetUserByEmail(ctx, input.Email)
+	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	hash := s.authCfg.FakeHash
 	if err == nil && user != nil {
 		hash = user.Password
 	}
 
-	verifyErr := password.VerifyPassword(hash, input.Password)
+	verifyErr := s.hasher.VerifyPassword(hash, input.Password)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.NewUnauthorizedError(MsgInvalidCredentials)
+		}
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
@@ -84,7 +90,7 @@ func (s *Service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutp
 		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
 	}
 
-	user, err := s.repo.GetUserByID(ctx, token.UserID)
+	user, err := s.userRepo.GetByID(ctx, token.UserID)
 	if err != nil {
 		return nil, pkgerrors.NewInternalError(err)
 	}

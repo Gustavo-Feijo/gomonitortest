@@ -1,6 +1,6 @@
 services:
   redis:
-    image: redis:latest
+    image: redis:8.4
     container_name: redis
     restart: always
     ports:
@@ -13,7 +13,7 @@ services:
       retries: 5
 
   postgresql:
-    image: postgres:latest
+    image: postgres:18-alpine
     container_name: postgresql
     restart: always
     ports:

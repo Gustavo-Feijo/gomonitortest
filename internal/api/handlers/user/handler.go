@@ -11,13 +11,15 @@ import (
 
 type Handler struct {
 	service      *user.Service
-	tokenManager *jwt.TokenManager
+	tokenManager jwt.TokenManager
 }
 
 func NewHandler(deps *deps.Deps) *Handler {
+	userRepo := user.NewRepository(deps.DB)
 	svcDeps := &user.ServiceDeps{
-		Logger: deps.Logger,
-		DB:     deps.DB,
+		Hasher:   deps.Hasher,
+		Logger:   deps.Logger,
+		UserRepo: userRepo,
 	}
 	svc := user.NewService(svcDeps)
 

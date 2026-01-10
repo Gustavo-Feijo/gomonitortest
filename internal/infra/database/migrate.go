@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"gomonitor/internal/config"
+	"net/url"
+	"path/filepath"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -27,8 +29,14 @@ func RunMigrations(ctx context.Context, cfg *config.DatabaseConfig, db *gorm.DB)
 		return fmt.Errorf("could not create migration driver: %w", err)
 	}
 
+	absPath, _ := filepath.Abs(cfg.MigrationsPath)
+	u := url.URL{
+		Scheme: "file",
+		Path:   absPath,
+	}
+
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://migrations",
+		u.String(),
 		cfg.Database,
 		driver,
 	)

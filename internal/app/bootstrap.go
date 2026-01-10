@@ -6,6 +6,7 @@ import (
 	"gomonitor/internal/domain/user"
 	"gomonitor/internal/infra/deps"
 	"gomonitor/internal/pkg/identity"
+	"gomonitor/internal/pkg/password"
 	"log/slog"
 
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 func bootstrapApp(ctx context.Context, cfg *config.Config, deps *deps.Deps) error {
 	return deps.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
-		if err := createAdminUser(ctx, cfg.Admin, tx, deps.Logger); err != nil {
+		if err := createAdminUser(ctx, cfg.Admin, tx, deps.Logger, deps.Hasher); err != nil {
 			return err
 		}
 
@@ -23,7 +24,7 @@ func bootstrapApp(ctx context.Context, cfg *config.Config, deps *deps.Deps) erro
 }
 
 // createAdminUser initializes the first user on the application as admin.
-func createAdminUser(ctx context.Context, cfg *config.AdminConfig, db *gorm.DB, logger *slog.Logger) error {
+func createAdminUser(ctx context.Context, cfg *config.AdminConfig, db *gorm.DB, logger *slog.Logger, hasher password.PasswordHasher) error {
 	userRepo := user.NewRepository(db)
 
 	count, err := userRepo.Count(ctx)
@@ -37,8 +38,9 @@ func createAdminUser(ctx context.Context, cfg *config.AdminConfig, db *gorm.DB, 
 	}
 
 	userSvcDeps := &user.ServiceDeps{
-		Logger: logger,
-		DB:     db,
+		Hasher:   hasher,
+		Logger:   logger,
+		UserRepo: userRepo,
 	}
 	userSvc := user.NewService(userSvcDeps)
 

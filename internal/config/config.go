@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -72,7 +73,48 @@ func getIntEnv(env string, defaultVal int) int {
 // loadEnv loads the enviromental values if running outside docker.
 func loadEnv() error {
 	if os.Getenv("ENVIRONMENT") == "" {
-		return godotenv.Load()
+		projectRoot := findProjectRoot()
+		if projectRoot == "" {
+			log.Fatal("Error finding project root")
+		}
+
+		return loadMissingEnv(filepath.Join(projectRoot, ".env"))
 	}
+
 	return nil
+}
+
+// loadMissing loads only missing envs, allowing to override some configs (Test containers ports for example)
+func loadMissingEnv(filenames ...string) error {
+	envs, err := godotenv.Read(filenames...)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range envs {
+		if _, exists := os.LookupEnv(k); !exists {
+			_ = os.Setenv(k, v)
+		}
+	}
+
+	return nil
+}
+
+func findProjectRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }

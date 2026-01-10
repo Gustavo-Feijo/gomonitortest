@@ -38,7 +38,14 @@ func ErrorMiddleware() gin.HandlerFunc {
 
 		if appErr.StatusCode >= 500 {
 			logger := logging.FromContext(c.Request.Context())
-			logger.Error("unexpected error occurred", slog.Any("err", err))
+			logger.Error("unexpected error occurred",
+				slog.Any("err", appErr.Err),
+				// Default source won't work on middleware correctly .
+				slog.Group("error_source",
+					slog.String("file", appErr.File),
+					slog.Int("line", appErr.Line),
+				),
+			)
 		}
 
 		c.JSON(appErr.StatusCode, ErrorResponse{

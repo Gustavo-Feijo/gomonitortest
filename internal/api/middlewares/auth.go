@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthMiddleware(tokenManager *jwt.TokenManager) gin.HandlerFunc {
+func AuthMiddleware(tokenManager jwt.TokenManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractToken(c)
 		if token == "" {

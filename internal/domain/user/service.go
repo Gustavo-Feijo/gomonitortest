@@ -15,21 +15,22 @@ import (
 )
 
 type ServiceDeps struct {
-	Logger *slog.Logger
-	DB     *gorm.DB
+	Hasher   password.PasswordHasher
+	Logger   *slog.Logger
+	UserRepo Repository
 }
 
 type Service struct {
-	logger *slog.Logger
-	repo   *repository
+	hasher   password.PasswordHasher
+	logger   *slog.Logger
+	userRepo Repository
 }
 
 func NewService(deps *ServiceDeps) *Service {
-	repo := NewRepository(deps.DB)
-
 	return &Service{
-		logger: deps.Logger,
-		repo:   repo,
+		logger:   deps.Logger,
+		hasher:   deps.Hasher,
+		userRepo: deps.UserRepo,
 	}
 }
 
@@ -56,7 +57,7 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User,
 		role = identity.RoleUser
 	}
 
-	hashedPassword, err := password.HashPassword(input.Password)
+	hashedPassword, err := s.hasher.HashPassword(input.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User,
 		Role:     role,
 	}
 
-	err = s.repo.Create(ctx, user)
+	err = s.userRepo.Create(ctx, user)
 	if err != nil {
 		logging.FromContext(ctx).Error("failed to create user",
 			"created_by", principal.UserID,
@@ -95,9 +96,9 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User,
 }
 
 func (s *Service) GetUser(ctx context.Context, input GetUserInput) (*User, error) {
-	user, err := s.repo.FindByID(ctx, input.ID)
+	user, err := s.userRepo.GetByID(ctx, input.ID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.NewNotFoundError("User not found", err)
 		}
 		return nil, err

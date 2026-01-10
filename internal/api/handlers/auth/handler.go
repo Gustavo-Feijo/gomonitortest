@@ -3,6 +3,7 @@ package authhandler
 import (
 	"gomonitor/internal/config"
 	"gomonitor/internal/domain/auth"
+	"gomonitor/internal/domain/user"
 	"gomonitor/internal/infra/deps"
 	"log/slog"
 
@@ -15,9 +16,11 @@ type Handler struct {
 }
 
 func NewHandler(deps *deps.Deps, authCfg *config.AuthConfig) *Handler {
+	userRepo := user.NewRepository(deps.DB)
 	svcDeps := &auth.ServiceDeps{
 		AuthConfig:   authCfg,
-		DB:           deps.DB,
+		Hasher:       deps.Hasher,
+		UserRepo:     userRepo,
 		Logger:       deps.Logger,
 		TokenManager: deps.TokenManager,
 	}
