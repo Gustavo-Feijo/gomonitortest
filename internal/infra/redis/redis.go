@@ -12,14 +12,19 @@ import (
 	"github.com/sony/gobreaker/v2"
 )
 
+type RedisClient interface {
+	Raw() *redis.Client
+	Get(ctx context.Context, key string) (string, error)
+}
+
 // Wrapper on the redis client, handle nil client checks.
-type RedisClient struct {
+type redisClient struct {
 	cb     *gobreaker.CircuitBreaker[any]
 	client *redis.Client
 }
 
 // New creates and returns a new redis connection pool.
-func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (*RedisClient, error) {
+func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (RedisClient, error) {
 	redis.SetLogger(&logging.VoidLogger{})
 	client := redis.NewClient(&redis.Options{
 		Addr:         cfg.Addr,
@@ -64,7 +69,7 @@ func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (*Re
 		},
 	})
 
-	return &RedisClient{
+	return &redisClient{
 		client: client,
 		cb:     cb,
 	}, nil
@@ -72,12 +77,12 @@ func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (*Re
 
 // Raw is a method to retrieve the raw client directly for one off operations.
 // It's preferable to implement the wrapper to the necessary method.
-func (rs *RedisClient) Raw() *redis.Client {
+func (rs *redisClient) Raw() *redis.Client {
 	return rs.client
 }
 
 // Get wrapper with nil client check and result extracted.
-func (rs *RedisClient) Get(ctx context.Context, key string) (string, error) {
+func (rs *redisClient) Get(ctx context.Context, key string) (string, error) {
 	res, err := rs.cb.Execute(func() (any, error) {
 		return rs.client.Get(ctx, key).Result()
 	})

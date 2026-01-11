@@ -14,6 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type Service interface {
+	Login(ctx context.Context, input LoginInput) (*LoginOutput, error)
+	Refresh(ctx context.Context, input RefreshInput) (*RefreshOutput, error)
+}
+
 type ServiceDeps struct {
 	AuthConfig   *config.AuthConfig
 	UserRepo     user.Repository
@@ -22,7 +27,7 @@ type ServiceDeps struct {
 	TokenManager jwt.TokenManager
 }
 
-type Service struct {
+type service struct {
 	authCfg      *config.AuthConfig
 	logger       *slog.Logger
 	hasher       password.PasswordHasher
@@ -30,8 +35,8 @@ type Service struct {
 	tokenManager jwt.TokenManager
 }
 
-func NewService(deps *ServiceDeps) *Service {
-	return &Service{
+func NewService(deps *ServiceDeps) Service {
+	return &service{
 		authCfg:      deps.AuthConfig,
 		logger:       deps.Logger,
 		hasher:       deps.Hasher,
@@ -40,14 +45,17 @@ func NewService(deps *ServiceDeps) *Service {
 	}
 }
 
-func (s *Service) Login(ctx context.Context, input LoginInput) (*LoginOutput, error) {
+func (s *service) Login(ctx context.Context, input LoginInput) (*LoginOutput, error) {
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	hash := s.authCfg.FakeHash
 	if err == nil && user != nil {
 		hash = user.Password
 	}
 
+	// First apply the hash to avoid enumeration.
 	verifyErr := s.hasher.VerifyPassword(hash, input.Password)
+
+	// Treat DB error or non existent user.
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.NewUnauthorizedError(MsgInvalidCredentials)
@@ -55,7 +63,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*LoginOutput, er
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
-	if user == nil || verifyErr != nil {
+	if verifyErr != nil {
 		logging.FromContext(ctx).Warn(
 			"unauthorized login request",
 			slog.Any("email", input.Email),
@@ -80,7 +88,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*LoginOutput, er
 	}, nil
 }
 
-func (s *Service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutput, error) {
+func (s *service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutput, error) {
 	token, err := s.tokenManager.ValidateRefreshToken(input.RefreshToken)
 	if err != nil {
 		logging.FromContext(ctx).Warn(
@@ -92,15 +100,10 @@ func (s *Service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutp
 
 	user, err := s.userRepo.GetByID(ctx, token.UserID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.NewUnauthorizedError(MsgInvalidCredentials)
+		}
 		return nil, pkgerrors.NewInternalError(err)
-	}
-
-	if user == nil {
-		logging.FromContext(ctx).Warn(
-			"non existent user refresh request",
-		)
-
-		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
 	}
 
 	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)

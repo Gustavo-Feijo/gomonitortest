@@ -19,7 +19,7 @@ type Deps struct {
 	DB           *gorm.DB
 	Hasher       password.PasswordHasher
 	Logger       *slog.Logger
-	Redis        *redisinfra.RedisClient
+	Redis        redisinfra.RedisClient
 	TokenManager jwt.TokenManager
 }
 

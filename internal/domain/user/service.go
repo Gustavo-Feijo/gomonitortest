@@ -14,27 +14,32 @@ import (
 	"gorm.io/gorm"
 )
 
+type Service interface {
+	CreateUser(ctx context.Context, input CreateUserInput) (*User, error)
+	GetUser(ctx context.Context, input GetUserInput) (*User, error)
+}
+
 type ServiceDeps struct {
 	Hasher   password.PasswordHasher
 	Logger   *slog.Logger
 	UserRepo Repository
 }
 
-type Service struct {
+type service struct {
 	hasher   password.PasswordHasher
 	logger   *slog.Logger
 	userRepo Repository
 }
 
-func NewService(deps *ServiceDeps) *Service {
-	return &Service{
+func NewService(deps *ServiceDeps) Service {
+	return &service{
 		logger:   deps.Logger,
 		hasher:   deps.Hasher,
 		userRepo: deps.UserRepo,
 	}
 }
 
-func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
+func (s *service) CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
 	principal, ok := identity.PrincipalFromContext(ctx)
 	if !ok {
 		logging.FromContext(ctx).Warn("unauthenticated user creation attempt")
@@ -95,7 +100,7 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*User,
 	return user, nil
 }
 
-func (s *Service) GetUser(ctx context.Context, input GetUserInput) (*User, error) {
+func (s *service) GetUser(ctx context.Context, input GetUserInput) (*User, error) {
 	user, err := s.userRepo.GetByID(ctx, input.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

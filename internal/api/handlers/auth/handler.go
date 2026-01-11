@@ -12,7 +12,7 @@ import (
 
 type Handler struct {
 	logger  *slog.Logger
-	service *auth.Service
+	service auth.Service
 }
 
 func NewHandler(deps *deps.Deps, authCfg *config.AuthConfig) *Handler {

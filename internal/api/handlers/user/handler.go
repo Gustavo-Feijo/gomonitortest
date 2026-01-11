@@ -10,7 +10,7 @@ import (
 )
 
 type Handler struct {
-	service      *user.Service
+	service      user.Service
 	tokenManager jwt.TokenManager
 }
 
