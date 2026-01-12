@@ -3,29 +3,23 @@ package userhandler
 import (
 	"gomonitor/internal/api/middlewares"
 	"gomonitor/internal/domain/user"
-	"gomonitor/internal/infra/deps"
 	"gomonitor/internal/pkg/jwt"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
+	logger       *slog.Logger
 	service      user.Service
 	tokenManager jwt.TokenManager
 }
 
-func NewHandler(deps *deps.Deps) *Handler {
-	userRepo := user.NewRepository(deps.DB)
-	svcDeps := &user.ServiceDeps{
-		Hasher:   deps.Hasher,
-		Logger:   deps.Logger,
-		UserRepo: userRepo,
-	}
-	svc := user.NewService(svcDeps)
-
+func NewHandler(logger *slog.Logger, svc user.Service, tokenManager jwt.TokenManager) *Handler {
 	return &Handler{
+		logger:       logger,
 		service:      svc,
-		tokenManager: deps.TokenManager,
+		tokenManager: tokenManager,
 	}
 }
 

@@ -2,20 +2,18 @@ package app
 
 import (
 	"context"
-	"gomonitor/internal/config"
+	"gomonitor/internal/container"
 	"gomonitor/internal/domain/user"
-	"gomonitor/internal/infra/deps"
 	"gomonitor/internal/pkg/identity"
-	"gomonitor/internal/pkg/password"
 	"log/slog"
 
 	"gorm.io/gorm"
 )
 
-func bootstrapApp(ctx context.Context, cfg *config.Config, deps *deps.Deps) error {
-	return deps.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+func bootstrapApp(ctx context.Context, container *container.Container) error {
+	return container.Deps.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
-		if err := createAdminUser(ctx, cfg.Admin, tx, deps.Logger, deps.Hasher); err != nil {
+		if err := createAdminUser(ctx, tx, container); err != nil {
 			return err
 		}
 
@@ -24,7 +22,12 @@ func bootstrapApp(ctx context.Context, cfg *config.Config, deps *deps.Deps) erro
 }
 
 // createAdminUser initializes the first user on the application as admin.
-func createAdminUser(ctx context.Context, cfg *config.AdminConfig, db *gorm.DB, logger *slog.Logger, hasher password.PasswordHasher) error {
+func createAdminUser(ctx context.Context, db *gorm.DB, c *container.Container) error {
+	logger := c.Deps.Logger
+	hasher := c.Deps.Hasher
+	cfg := c.Cfg.Admin
+
+	// Create new repository and service instead of using the container one due to the transactional nature.
 	userRepo := user.NewRepository(db)
 
 	count, err := userRepo.Count(ctx)

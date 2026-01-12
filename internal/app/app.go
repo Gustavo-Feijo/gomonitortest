@@ -3,10 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
-	authhandler "gomonitor/internal/api/handlers/auth"
-	userhandler "gomonitor/internal/api/handlers/user"
 	"gomonitor/internal/api/middlewares"
 	"gomonitor/internal/config"
+	"gomonitor/internal/container"
 	databaseinfra "gomonitor/internal/infra/database"
 	"gomonitor/internal/infra/deps"
 	"log/slog"
@@ -37,11 +36,14 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		return nil, fmt.Errorf("error running migrations: %v", err)
 	}
 
-	if err = bootstrapApp(ctx, cfg, deps); err != nil {
+	container := container.New(deps, cfg)
+
+	if err = bootstrapApp(ctx, container); err != nil {
 		logger.Error("error bootstrapping application", slog.Any("err", err))
 	}
 
 	engine := gin.New()
+	engine.HandleMethodNotAllowed = true
 
 	// Add middlewares.
 	engine.Use(gin.Recovery())
@@ -50,8 +52,8 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 	engine.Use(middlewares.ErrorMiddleware())
 	engine.Use(middlewares.PrometheusMiddleware())
 
-	userHandler := userhandler.NewHandler(deps)
-	authHandler := authhandler.NewHandler(deps, cfg.Auth)
+	userHandler := container.Handler.User
+	authHandler := container.Handler.Auth
 
 	registerRoutes(engine, userHandler, authHandler)
 
@@ -73,7 +75,8 @@ func registerRoutes(r *gin.Engine, handlers ...RouteRegister) {
 
 	api := r.Group("/api")
 
+	v1 := api.Group("/v1")
 	for _, h := range handlers {
-		h.RegisterRoutes(api)
+		h.RegisterRoutes(v1)
 	}
 }
