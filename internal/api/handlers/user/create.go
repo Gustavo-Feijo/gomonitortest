@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) create(c *gin.Context) {
+func (h *Handler) Create(c *gin.Context) {
 	var req userdto.CreateUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {

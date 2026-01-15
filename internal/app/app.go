@@ -48,7 +48,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 	// Add middlewares.
 	engine.Use(gin.Recovery())
 	engine.Use(middlewares.TracingMiddleware(cfg))
-	engine.Use(middlewares.LoggingMiddleware(deps))
+	engine.Use(middlewares.LoggingMiddleware(container.Deps.Logger))
 	engine.Use(middlewares.ErrorMiddleware())
 	engine.Use(middlewares.PrometheusMiddleware())
 

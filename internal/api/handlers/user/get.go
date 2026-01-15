@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) getByID(c *gin.Context) {
+func (h *Handler) GetByID(c *gin.Context) {
 	var req userdto.GetUserRequest
 
 	if err := c.ShouldBindUri(&req); err != nil {

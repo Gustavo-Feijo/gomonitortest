@@ -26,7 +26,7 @@ func NewHandler(logger *slog.Logger, svc user.Service, tokenManager jwt.TokenMan
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	users := r.Group("/users", middlewares.AuthMiddleware(h.tokenManager))
 	{
-		users.POST("", h.create)
-		users.GET("/:id", h.getByID)
+		users.POST("", h.Create)
+		users.GET("/:id", h.GetByID)
 	}
 }
