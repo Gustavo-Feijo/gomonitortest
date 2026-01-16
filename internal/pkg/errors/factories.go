@@ -5,6 +5,8 @@ import (
 	"runtime"
 )
 
+var RuntimeCaller = runtime.Caller
+
 func NewBadRequestError(msg string, err ...error) *AppError {
 	return newAppError("BAD_REQUEST", msg, http.StatusBadRequest, err...)
 }
@@ -35,7 +37,7 @@ func newAppError(code, msg string, statusCode int, err ...error) *AppError {
 		underlyingErr = err[0]
 	}
 
-	_, file, line, ok := runtime.Caller(2)
+	_, file, line, ok := RuntimeCaller(2)
 	if !ok {
 		file = "unknown"
 		line = 0

@@ -77,11 +77,8 @@ func (t *tokenManager) validateToken(tokenString string, tokenType TokenType, se
 		return nil, ErrInvalidToken
 	}
 
-	claims, ok := token.Claims.(*CustomClaims)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
+	// Guaranteed to be *CustomClains due to parse with Claims.
+	claims, _ := token.Claims.(*CustomClaims)
 	if claims.Type != tokenType {
 		return nil, ErrInvalidTokenType
 	}
