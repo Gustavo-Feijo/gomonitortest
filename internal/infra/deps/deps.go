@@ -23,18 +23,15 @@ type Deps struct {
 	TokenManager jwt.TokenManager
 }
 
-// NewDeps creates the necessary instances.
-func NewDeps(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Deps, error) {
+// New creates the necessary instances.
+func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Deps, error) {
 	db, err := databaseinfra.New(ctx, cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("error at opening db conn: %w", err)
 	}
 
 	// Treat redis connection. Redis is optional for full functionality.
-	rdb, err := redisinfra.New(ctx, cfg.Redis, logger)
-	if err != nil {
-		logger.Error("failed to initialize redis connection", slog.Any("err", err))
-	}
+	rdb := redisinfra.New(ctx, cfg, logger)
 
 	return &Deps{
 		DB:           db,

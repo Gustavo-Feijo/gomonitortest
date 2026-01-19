@@ -10,13 +10,14 @@ import (
 )
 
 type Config struct {
-	Admin    *AdminConfig
-	Auth     *AuthConfig
-	Database *DatabaseConfig
-	HTTP     *HTTPConfig
-	Logging  *LoggingConfig
-	Redis    *RedisConfig
-	Tracing  *TracingConfig
+	Admin          *AdminConfig
+	Auth           *AuthConfig
+	CircuitBreaker *CircuitBreakerConfig
+	Database       *DatabaseConfig
+	HTTP           *HTTPConfig
+	Logging        *LoggingConfig
+	Redis          *RedisConfig
+	Tracing        *TracingConfig
 }
 
 // Load get all necessary configuration values.
@@ -36,13 +37,14 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Admin:    adminConfig,
-		Auth:     authConfig,
-		Database: getDatabaseConfig(),
-		HTTP:     getHTTPConfig(),
-		Logging:  getLoggingConfig(),
-		Redis:    getRedisConfig(),
-		Tracing:  getTracingConfig(),
+		Admin:          adminConfig,
+		Auth:           authConfig,
+		CircuitBreaker: getCircuitBreakerConfig(),
+		Database:       getDatabaseConfig(),
+		HTTP:           getHTTPConfig(),
+		Logging:        getLoggingConfig(),
+		Redis:          getRedisConfig(),
+		Tracing:        getTracingConfig(),
 	}, nil
 }
 

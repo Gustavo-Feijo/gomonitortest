@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"gomonitor/internal/testutil"
+	"log"
 	"os"
 	"testing"
 
@@ -11,7 +12,11 @@ import (
 var testDB *gorm.DB
 
 func TestMain(m *testing.M) {
-	db, cleanup := testutil.NewTestConnection()
+	db, cleanup, err := testutil.NewTestDBConnection()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cleanup()
 	testDB = db
 	code := m.Run()
 	cleanup()

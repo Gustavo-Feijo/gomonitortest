@@ -13,8 +13,8 @@ import (
 )
 
 type RedisClient interface {
-	Raw() *redis.Client
 	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 }
 
 // Wrapper on the redis client, handle nil client checks.
@@ -23,24 +23,28 @@ type redisClient struct {
 	client *redis.Client
 }
 
+var instrumentRedisTracing = redisotel.InstrumentTracing
+
 // New creates and returns a new redis connection pool.
-func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (RedisClient, error) {
+// Always returns the client, even if can't connect to it.
+// Implements circuit breaking and retries in the case Redis is down.
+func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) RedisClient {
 	redis.SetLogger(&logging.VoidLogger{})
 	client := redis.NewClient(&redis.Options{
-		Addr:         cfg.Addr,
-		Password:     cfg.Password,
-		DB:           cfg.Database,
-		MaxRetries:   cfg.MaxRetries,
-		PoolSize:     cfg.PoolSize,
-		MinIdleConns: cfg.MinIdleConns,
-		PoolTimeout:  cfg.PoolTimeout,
+		Addr:         cfg.Redis.Addr,
+		Password:     cfg.Redis.Password,
+		DB:           cfg.Redis.Database,
+		MaxRetries:   cfg.Redis.MaxRetries,
+		PoolSize:     cfg.Redis.PoolSize,
+		MinIdleConns: cfg.Redis.MinIdleConns,
+		PoolTimeout:  cfg.Redis.PoolTimeout,
 	})
 
 	if err := client.Ping(ctx).Err(); err != nil {
 		logger.Warn("couldn't connect correctly to Redis", slog.Any("err", err))
 	}
 
-	if err := redisotel.InstrumentTracing(
+	if err := instrumentRedisTracing(
 		client,
 		redisotel.WithCommandFilter(redisotel.DefaultCommandFilter),
 		redisotel.WithDialFilter(true),
@@ -50,11 +54,11 @@ func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (Red
 
 	cb := gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
 		Name:        "redis",
-		MaxRequests: 5,
+		MaxRequests: cfg.CircuitBreaker.MaxRequests,
 		Interval:    time.Minute,
 		Timeout:     time.Minute,
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
-			return counts.ConsecutiveFailures >= 5
+			return counts.ConsecutiveFailures >= cfg.CircuitBreaker.MaxFailures
 		},
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			logger.Warn("circuit breaker changing state",
@@ -72,16 +76,11 @@ func New(ctx context.Context, cfg *config.RedisConfig, logger *slog.Logger) (Red
 	return &redisClient{
 		client: client,
 		cb:     cb,
-	}, nil
+	}
 }
 
-// Raw is a method to retrieve the raw client directly for one off operations.
-// It's preferable to implement the wrapper to the necessary method.
-func (rs *redisClient) Raw() *redis.Client {
-	return rs.client
-}
-
-// Get wrapper with nil client check and result extracted.
+// Get wrapper with Circuit break and result unwrapping.
+// If result is redis.Nil, the error is returned normally.
 func (rs *redisClient) Get(ctx context.Context, key string) (string, error) {
 	res, err := rs.cb.Execute(func() (any, error) {
 		return rs.client.Get(ctx, key).Result()
@@ -91,5 +90,13 @@ func (rs *redisClient) Get(ctx context.Context, key string) (string, error) {
 		return "", err
 	}
 
-	return res.(string), err
+	return res.(string), nil
+}
+
+// Set wrapper with Circuit break and result unwrapping.
+func (rs *redisClient) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
+	_, err := rs.cb.Execute(func() (any, error) {
+		return nil, rs.client.Set(ctx, key, value, ttl).Err()
+	})
+	return err
 }

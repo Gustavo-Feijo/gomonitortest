@@ -18,11 +18,16 @@ type RedisConfig struct {
 
 // getRedisConfig loads the redis environments and return the full config.
 func getRedisConfig() *RedisConfig {
-	host := getEnv("REDIS_HOST", "redis")
-	port := getEnv("REDIS_PORT", "6379")
+	addr := getEnv("REDIS_ADDR", "")
+
+	if addr == "" {
+		host := getEnv("REDIS_HOST", "redis")
+		port := getEnv("REDIS_PORT", "6379")
+		addr = fmt.Sprintf("%s:%s", host, port)
+	}
 
 	return &RedisConfig{
-		Addr:         fmt.Sprintf("%s:%s", host, port),
+		Addr:         addr,
 		Password:     getEnv("REDIS_PASSWORD", ""),
 		Database:     getIntEnv("REDIS_DATABASE", 0),
 		MaxRetries:   getIntEnv("REDIS_MAX_RETRIES", 3),

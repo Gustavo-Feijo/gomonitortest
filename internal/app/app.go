@@ -27,7 +27,7 @@ type RouteRegister interface {
 
 // New returns a new app.
 func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, error) {
-	deps, err := deps.NewDeps(ctx, cfg, logger)
+	deps, err := deps.New(ctx, cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing dependencies: %v", err)
 	}
