@@ -13,6 +13,7 @@ import (
 )
 
 type RedisClient interface {
+	Close() error
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 }
@@ -28,16 +29,16 @@ var instrumentRedisTracing = redisotel.InstrumentTracing
 // New creates and returns a new redis connection pool.
 // Always returns the client, even if can't connect to it.
 // Implements circuit breaking and retries in the case Redis is down.
-func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) RedisClient {
+func New(ctx context.Context, redisCfg *config.RedisConfig, cbCfg *config.CircuitBreakerConfig, logger *slog.Logger) RedisClient {
 	redis.SetLogger(&logging.VoidLogger{})
 	client := redis.NewClient(&redis.Options{
-		Addr:         cfg.Redis.Addr,
-		Password:     cfg.Redis.Password,
-		DB:           cfg.Redis.Database,
-		MaxRetries:   cfg.Redis.MaxRetries,
-		PoolSize:     cfg.Redis.PoolSize,
-		MinIdleConns: cfg.Redis.MinIdleConns,
-		PoolTimeout:  cfg.Redis.PoolTimeout,
+		Addr:         redisCfg.Addr,
+		Password:     redisCfg.Password,
+		DB:           redisCfg.Database,
+		MaxRetries:   redisCfg.MaxRetries,
+		PoolSize:     redisCfg.PoolSize,
+		MinIdleConns: redisCfg.MinIdleConns,
+		PoolTimeout:  redisCfg.PoolTimeout,
 	})
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -54,11 +55,11 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) RedisClie
 
 	cb := gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
 		Name:        "redis",
-		MaxRequests: cfg.CircuitBreaker.MaxRequests,
+		MaxRequests: cbCfg.MaxRequests,
 		Interval:    time.Minute,
 		Timeout:     time.Minute,
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
-			return counts.ConsecutiveFailures >= cfg.CircuitBreaker.MaxFailures
+			return counts.ConsecutiveFailures >= cbCfg.MaxFailures
 		},
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			logger.Warn("circuit breaker changing state",
@@ -99,4 +100,8 @@ func (rs *redisClient) Set(ctx context.Context, key string, value any, ttl time.
 		return nil, rs.client.Set(ctx, key, value, ttl).Err()
 	})
 	return err
+}
+
+func (rs *redisClient) Close() error {
+	return rs.client.Close()
 }

@@ -26,14 +26,16 @@ type RouteRegister interface {
 }
 
 // New returns a new app.
-func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, error) {
-	deps, err := deps.New(ctx, cfg, logger)
+func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, func(context.Context) error, error) {
+	deps, depsCleanup, err := deps.New(ctx, cfg, logger)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing dependencies: %v", err)
+		_ = depsCleanup(ctx)
+		return nil, nil, fmt.Errorf("error initializing dependencies: %v", err)
 	}
 
 	if err := databaseinfra.RunMigrations(ctx, cfg.Database, deps.DB); err != nil {
-		return nil, fmt.Errorf("error running migrations: %v", err)
+		_ = depsCleanup(ctx)
+		return nil, nil, fmt.Errorf("error running migrations: %v", err)
 	}
 
 	container := container.New(deps, cfg)
@@ -60,7 +62,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 	return &App{
 		Engine: engine,
 		Addr:   cfg.HTTP.Address,
-	}, nil
+	}, depsCleanup, nil
 }
 
 // registerRoutes defines the base API path and calls the  handlers.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"gomonitor/internal/config"
-	"gomonitor/internal/testutil"
 	"log/slog"
 	"testing"
 
@@ -14,29 +13,15 @@ import (
 )
 
 func TestNewRedis(t *testing.T) {
-	redisContainer := testutil.StartTestRedis(t)
-	defer redisContainer.Terminate(t.Context())
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("couldn't load config: %v", err)
-	}
-
-	client := New(t.Context(), cfg, slog.Default())
+	t.Parallel()
+	client := New(t.Context(), testRedisCfg, testCbCfg, slog.Default())
 
 	// Redis should never be nil, even if out, the client is returned and retries are handled with CB.
 	assert.NotNil(t, client)
 }
 
 func TestNewRedisOut_ErrorIsLogged(t *testing.T) {
-	redisContainer := testutil.StartTestRedis(t)
-	redisContainer.Terminate(t.Context())
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("couldn't load config: %v", err)
-	}
-
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(
 		slog.NewTextHandler(&buf, &slog.HandlerOptions{
@@ -44,7 +29,7 @@ func TestNewRedisOut_ErrorIsLogged(t *testing.T) {
 		}),
 	)
 
-	client := New(t.Context(), cfg, logger)
+	client := New(t.Context(), &config.RedisConfig{Addr: "localhost:0000"}, testCbCfg, logger)
 
 	output := buf.String()
 
@@ -54,6 +39,7 @@ func TestNewRedisOut_ErrorIsLogged(t *testing.T) {
 
 // Just to add the sweet 100% coverage.
 func TestRedisTracing_ErrorIsLogged(t *testing.T) {
+	t.Parallel()
 	orig := instrumentRedisTracing
 	t.Cleanup(func() { instrumentRedisTracing = orig })
 
@@ -64,14 +50,6 @@ func TestRedisTracing_ErrorIsLogged(t *testing.T) {
 		return errors.New("boom")
 	}
 
-	redisContainer := testutil.StartTestRedis(t)
-	defer redisContainer.Terminate(t.Context())
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("couldn't load config: %v", err)
-	}
-
 	var buf bytes.Buffer
 	logger := slog.New(
 		slog.NewTextHandler(&buf, &slog.HandlerOptions{
@@ -79,35 +57,26 @@ func TestRedisTracing_ErrorIsLogged(t *testing.T) {
 		}),
 	)
 
-	_ = New(t.Context(), cfg, logger)
+	_ = New(t.Context(), testRedisCfg, testCbCfg, logger)
 
 	output := buf.String()
-
 	assert.Contains(t, output, "error while adding redis tracing")
 }
 
 func TestRedisCircuitBreaker(t *testing.T) {
-	redisContainer := testutil.StartTestRedis(t)
-	defer redisContainer.Terminate(t.Context())
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("couldn't load config: %v", err)
-	}
-
+	t.Parallel()
 	var buf bytes.Buffer
 	logger := slog.New(
 		slog.NewTextHandler(&buf, &slog.HandlerOptions{
 			Level: slog.LevelWarn,
 		}),
 	)
-	client := New(t.Context(), cfg, logger)
+	client := New(t.Context(), testRedisCfg, testCbCfg, logger)
 
-	// Terminate the container to test the CB error.
-	redisContainer.Terminate(t.Context())
+	client.Close()
 
 	// Execute queries until reaching the CB limit
-	for range cfg.CircuitBreaker.MaxFailures + 1 {
+	for range testCbCfg.MaxFailures + 1 {
 		client.Get(t.Context(), "test")
 	}
 	output := buf.String()
@@ -116,20 +85,14 @@ func TestRedisCircuitBreaker(t *testing.T) {
 }
 
 func TestRedisSet(t *testing.T) {
-	redisContainer := testutil.StartTestRedis(t)
-	defer redisContainer.Terminate(t.Context())
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("couldn't load config: %v", err)
-	}
-	client := New(t.Context(), cfg, slog.Default())
+	t.Parallel()
+	client := New(t.Context(), testRedisCfg, testCbCfg, slog.Default())
 
 	// Happy path with Redis working.
-	err = client.Set(t.Context(), "test", 5, 0)
+	err := client.Set(t.Context(), "test", 5, 0)
 	assert.Nil(t, err)
 
-	redisContainer.Terminate(t.Context())
+	client.Close()
 
 	// Redis not working.
 	err = client.Set(t.Context(), "test", 5, 0)
@@ -137,14 +100,8 @@ func TestRedisSet(t *testing.T) {
 }
 
 func TestRedisGet(t *testing.T) {
-	redisContainer := testutil.StartTestRedis(t)
-	defer redisContainer.Terminate(t.Context())
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("couldn't load config: %v", err)
-	}
-	client := New(t.Context(), cfg, slog.Default())
+	t.Parallel()
+	client := New(t.Context(), testRedisCfg, testCbCfg, slog.Default())
 
 	val, err := client.Get(t.Context(), "nonexistent")
 	assert.Equal(t, val, "")

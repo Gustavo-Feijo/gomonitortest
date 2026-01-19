@@ -43,7 +43,7 @@ func main() {
 
 	}()
 
-	engine, err := app.New(context.Background(), cfg, logger)
+	engine, depsCleanup, err := app.New(context.Background(), cfg, logger)
 	if err != nil {
 		logger.Error("failed to initialize app", slog.Any("err", err))
 		return
@@ -78,4 +78,8 @@ func main() {
 		logger.Error("failed to shutdown server", slog.Any("err", err))
 	}
 	logger.Info("successfully shutdown server")
+
+	if err := depsCleanup(shutdownCtx); err != nil {
+		logger.Error("failed to cleanup deps", slog.Any("err", err))
+	}
 }

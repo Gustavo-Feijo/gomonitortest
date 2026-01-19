@@ -19,12 +19,12 @@ func TestNewDeps(t *testing.T) {
 		t.Fatalf("couldn't load config: %v", err)
 	}
 
-	depsSuccess, err := deps.New(t.Context(), cfg, slog.Default())
+	depsSuccess, _, err := deps.New(t.Context(), cfg, slog.Default())
 	assert.Nil(t, err)
 	assert.NotNil(t, depsSuccess.DB)
 
 	postgresContainer.Terminate(t.Context())
-	depsErr, err := deps.New(t.Context(), cfg, slog.Default())
+	depsErr, _, err := deps.New(t.Context(), cfg, slog.Default())
 	assert.NotNil(t, err)
 	assert.Nil(t, depsErr)
 }
