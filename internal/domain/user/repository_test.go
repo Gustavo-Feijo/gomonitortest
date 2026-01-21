@@ -4,6 +4,7 @@ import (
 	"context"
 	"gomonitor/internal/domain/user"
 	"gomonitor/internal/domain/user/testdata"
+	databaseinfra "gomonitor/internal/infra/database"
 	"gomonitor/internal/pkg/identity"
 	"gomonitor/internal/testutil"
 	"testing"
@@ -14,6 +15,8 @@ import (
 
 func TestRepository_Count(t *testing.T) {
 	t.Parallel()
+	db, _ := databaseinfra.New(t.Context(), testDbCfg)
+
 	tests := []struct {
 		name           string
 		expectedResult testutil.Result[int64]
@@ -41,7 +44,7 @@ func TestRepository_Count(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := setupTx(t)
+			tx := setupTx(t, db)
 
 			if tt.setupFunc != nil {
 				tt.setupFunc(tx)
@@ -70,6 +73,8 @@ func TestRepository_Count(t *testing.T) {
 
 func TestRepository_Create(t *testing.T) {
 	t.Parallel()
+	db, _ := databaseinfra.New(t.Context(), testDbCfg)
+
 	tests := []struct {
 		name         string
 		setupFunc    func(db *gorm.DB)
@@ -103,7 +108,7 @@ func TestRepository_Create(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := setupTx(t)
+			tx := setupTx(t, db)
 
 			if tt.setupFunc != nil {
 				tt.setupFunc(tx)
@@ -134,6 +139,8 @@ func TestRepository_Create(t *testing.T) {
 
 func TestRepository_GetByID(t *testing.T) {
 	t.Parallel()
+	db, _ := databaseinfra.New(t.Context(), testDbCfg)
+
 	tests := []struct {
 		name         string
 		setupFunc    func(db *gorm.DB) *user.User
@@ -164,7 +171,7 @@ func TestRepository_GetByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := setupTx(t)
+			tx := setupTx(t, db)
 
 			var seededUser *user.User
 			if tt.setupFunc != nil {
@@ -198,6 +205,8 @@ func TestRepository_GetByID(t *testing.T) {
 
 func TestRepository_GetByEmail(t *testing.T) {
 	t.Parallel()
+	db, _ := databaseinfra.New(t.Context(), testDbCfg)
+
 	tests := []struct {
 		name         string
 		setupFunc    func(db *gorm.DB) *user.User
@@ -228,7 +237,7 @@ func TestRepository_GetByEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := setupTx(t)
+			tx := setupTx(t, db)
 
 			var seededUser *user.User
 			if tt.setupFunc != nil {

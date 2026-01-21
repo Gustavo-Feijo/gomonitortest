@@ -10,7 +10,7 @@ import (
 
 // startRedis creates a new redis test container.
 // Returns the container, the address, the cleanup function and any error.
-func StartRedis(ctx context.Context) (*tcredis.RedisContainer, string, func(ctx context.Context), error) {
+func StartRedis(ctx context.Context) (*tcredis.RedisContainer, string, func(ctx context.Context) error, error) {
 	container, err := tcredis.Run(ctx, "redis:8.4-alpine")
 	if err != nil {
 		return nil, "", nil, err
@@ -22,7 +22,7 @@ func StartRedis(ctx context.Context) (*tcredis.RedisContainer, string, func(ctx 
 		return nil, "", nil, err
 	}
 
-	return container, addr, func(ctx context.Context) { container.Terminate(ctx) }, nil
+	return container, addr, func(ctx context.Context) error { return container.Terminate(ctx) }, nil
 }
 
 // StartTestRedis creates a new redis test container, set up cleanup and environment variables.
@@ -33,7 +33,7 @@ func StartTestRedis(t *testing.T) *tcredis.RedisContainer {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		cleanup(t.Context())
+		_ = cleanup(ctx)
 	})
 
 	setupTestRedisEnv(t, addr)

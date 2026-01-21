@@ -33,6 +33,6 @@ func TestMain(m *testing.M) {
 	}
 
 	code := m.Run()
-	cleanup(ctx)
+	_ = cleanup(ctx)
 	os.Exit(code)
 }

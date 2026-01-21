@@ -29,7 +29,9 @@ type RouteRegister interface {
 func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, func(context.Context) error, error) {
 	deps, depsCleanup, err := deps.New(ctx, cfg, logger)
 	if err != nil {
-		_ = depsCleanup(ctx)
+		if depsCleanup != nil {
+			_ = depsCleanup(ctx)
+		}
 		return nil, nil, fmt.Errorf("error initializing dependencies: %v", err)
 	}
 
@@ -41,7 +43,8 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, fu
 	container := container.New(deps, cfg)
 
 	if err = bootstrapApp(ctx, container); err != nil {
-		logger.Error("error bootstrapping application", slog.Any("err", err))
+		_ = depsCleanup(ctx)
+		return nil, nil, fmt.Errorf("bootstrap failed: %w", err)
 	}
 
 	engine := gin.New()

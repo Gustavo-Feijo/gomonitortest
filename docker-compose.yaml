@@ -45,7 +45,7 @@ services:
     env_file:
       - .env
     environment:
-      - ENVIRONMENT=docker
+      - ENVIRONMENT=production
     depends_on:
       postgresql:
         condition: service_healthy

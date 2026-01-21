@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ type Config struct {
 	Database       *DatabaseConfig
 	HTTP           *HTTPConfig
 	Logging        *LoggingConfig
+	ProjectRoot    string
 	Redis          *RedisConfig
 	Tracing        *TracingConfig
 }
@@ -74,16 +76,31 @@ func getIntEnv(env string, defaultVal int) int {
 
 // loadEnv loads the enviromental values if running outside docker.
 func loadEnv() error {
-	if os.Getenv("ENVIRONMENT") == "" {
-		projectRoot := findProjectRoot()
-		if projectRoot == "" {
-			log.Fatal("Error finding project root")
-		}
-
-		return loadMissingEnv(filepath.Join(projectRoot, ".env"))
+	appEnv := getEnv("ENVIRONMENT", "development")
+	if appEnv == "" {
+		return fmt.Errorf("ENVIRONMENT must be set explicitly")
 	}
 
-	return nil
+	switch appEnv {
+	case "development", "test":
+		projectRoot := FindProjectRoot()
+		if projectRoot == "" {
+			return fmt.Errorf("could not find project root")
+		}
+
+		filename := ".env"
+		if appEnv == "test" {
+			filename = ".test.env"
+		}
+
+		return loadMissingEnv(filepath.Join(projectRoot, filename))
+
+	case "production":
+		return nil
+
+	default:
+		return fmt.Errorf("unknown ENVIRONMENT: %s", appEnv)
+	}
 }
 
 // loadMissing loads only missing envs, allowing to override some configs (Test containers ports for example)
@@ -102,7 +119,7 @@ func loadMissingEnv(filenames ...string) error {
 	return nil
 }
 
-func findProjectRoot() string {
+func FindProjectRoot() string {
 	dir, err := os.Getwd()
 	if err != nil {
 		return ""
@@ -119,4 +136,12 @@ func findProjectRoot() string {
 		}
 		dir = parent
 	}
+}
+
+func IsProduction() bool {
+	return os.Getenv("ENVIRONMENT") == "production"
+}
+
+func IsTest() bool {
+	return os.Getenv("ENVIRONMENT") == "test"
 }

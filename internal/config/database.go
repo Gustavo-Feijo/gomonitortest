@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 )
 
@@ -40,8 +39,8 @@ func getDatabaseConfig() *DatabaseConfig {
 	}
 
 	// Handle local testing outside docker.
-	if os.Getenv("ENVIRONMENT") == "" {
-		projectRoot := findProjectRoot()
+	if !IsProduction() {
+		projectRoot := FindProjectRoot()
 		if projectRoot == "" {
 			log.Fatal("Error finding project root")
 		}

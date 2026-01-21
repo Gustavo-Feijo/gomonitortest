@@ -28,7 +28,7 @@ func New(ctx context.Context, cfg *config.DatabaseConfig) (*gorm.DB, error) {
 
 	// Verify if could get the connection.
 	if sqlErr != nil {
-		return nil, fmt.Errorf("failed to get the sql connection: %v", err)
+		return nil, fmt.Errorf("failed to get the sql connection: %v", sqlErr)
 	}
 
 	// Set the pool values.

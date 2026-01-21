@@ -44,11 +44,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Deps, f
 		}
 
 		if db != nil {
-			sqlDb, err := db.DB()
-			if err != nil {
-				errs = append(errs, fmt.Errorf("couldn't get raw sql d b: %w", err))
-			}
-
+			sqlDb, _ := db.DB()
 			if err := sqlDb.Close(); err != nil {
 				errs = append(errs, fmt.Errorf("db close: %w", err))
 			}

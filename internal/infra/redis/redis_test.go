@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewRedis(t *testing.T) {
@@ -73,11 +74,13 @@ func TestRedisCircuitBreaker(t *testing.T) {
 	)
 	client := New(t.Context(), testRedisCfg, testCbCfg, logger)
 
-	client.Close()
+	redisCloseErr := client.Close()
+	require.Nil(t, redisCloseErr)
 
 	// Execute queries until reaching the CB limit
 	for range testCbCfg.MaxFailures + 1 {
-		client.Get(t.Context(), "test")
+		_, err := client.Get(t.Context(), "test")
+		assert.NotNil(t, err)
 	}
 	output := buf.String()
 
@@ -92,7 +95,8 @@ func TestRedisSet(t *testing.T) {
 	err := client.Set(t.Context(), "test", 5, 0)
 	assert.Nil(t, err)
 
-	client.Close()
+	redisCloseErr := client.Close()
+	require.Nil(t, redisCloseErr)
 
 	// Redis not working.
 	err = client.Set(t.Context(), "test", 5, 0)

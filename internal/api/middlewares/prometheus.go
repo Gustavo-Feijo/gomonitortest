@@ -1,12 +1,13 @@
 package middlewares
 
 import (
-	"gomonitor/internal/observability/prometheus"
+	pkgprometheus "gomonitor/internal/observability/prometheus"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func PrometheusMiddleware() gin.HandlerFunc {
-	prometheus.Init()
-	return prometheus.PrometheusMiddleware()
+	pkgprometheus.Init(prometheus.DefaultRegisterer)
+	return pkgprometheus.PrometheusMiddleware()
 }

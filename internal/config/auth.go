@@ -1,8 +1,8 @@
 package config
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -16,22 +16,23 @@ type AuthConfig struct {
 }
 
 func getAuthConfig() (*AuthConfig, error) {
-	AccessTokenSecret := getEnv("AUTH_ACCESS_TOKEN_SECRET", "")
-	refreshTokenSecret := getEnv("AUTH_REFRESH_TOKEN_SECRET", "")
-
-	// Fake hash to use when user doesn't exist.
+	var missing []string
+	accessToken := getEnv("AUTH_ACCESS_TOKEN_SECRET", "")
+	refreshToken := getEnv("AUTH_REFRESH_TOKEN_SECRET", "")
 	fakeHash := getEnv("AUTH_FAKE_HASH", "")
 
-	if AccessTokenSecret == "" {
-		return nil, errors.New("missing AUTH_ACCESS_TOKEN_SECRET")
+	if accessToken == "" {
+		missing = append(missing, "AUTH_ACCESS_TOKEN_SECRET")
 	}
-
-	if refreshTokenSecret == "" {
-		return nil, errors.New("missing AUTH_REFRESH_TOKEN_SECRET")
+	if refreshToken == "" {
+		missing = append(missing, "AUTH_REFRESH_TOKEN_SECRET")
 	}
-
 	if fakeHash == "" {
-		return nil, errors.New("missing AUTH_FAKE_HASH")
+		missing = append(missing, "AUTH_FAKE_HASH")
+	}
+
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing auth config: %s", strings.Join(missing, ", "))
 	}
 
 	AccessTokenTTL := getEnv("AUTH_ACCESS_TOKEN_TTL", "1h")
@@ -48,10 +49,10 @@ func getAuthConfig() (*AuthConfig, error) {
 	}
 
 	return &AuthConfig{
-		AccessTokenSecret:  AccessTokenSecret,
+		AccessTokenSecret:  accessToken,
 		AccessTokenTTL:     accessTokenDuration,
 		FakeHash:           fakeHash,
-		RefreshTokenSecret: refreshTokenSecret,
+		RefreshTokenSecret: refreshToken,
 		RefreshTokenTTL:    refreshTokenDuration,
 	}, nil
 }

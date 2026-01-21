@@ -20,7 +20,7 @@ var (
 	)
 )
 
-func Init() {
-	prometheus.MustRegister(HTTPRequests)
-	prometheus.MustRegister(RequestDuration)
+func Init(reg prometheus.Registerer) {
+	reg.MustRegister(HTTPRequests)
+	reg.MustRegister(RequestDuration)
 }

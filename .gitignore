@@ -1,5 +1,6 @@
 .env
 .local.env
+.test.env
 .vscode
 .scannerwork
 coverage.out
