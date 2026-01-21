@@ -16,6 +16,7 @@ The application will be a simple API with user creation and basic authentication
   - Observability implementation (Logging, Metrics and Tracing)
 - #### Redis
   - Shared cache.
+  - Instrumented in application to be optional, with Circuit Breaking if it is out.
 - #### PostgreSQL
   - Shared database.
 - #### Prometheus
@@ -39,6 +40,12 @@ The application will be a simple API with user creation and basic authentication
 
 ## Setup
 
-Create a '.env' file in simmilar format to 'example.env', if needed, change the configurations (Should run fine without any changes).
+To run the application, create a '.env' file in similar format to 'example.env', if needed, change the configurations (Should run fine without any changes).
 
-Run `docker compose up --build`
+Run `docker compose up --build` and everything should be good to go.
+
+If running locally, use the Makefile, with the following options:
+
+- make run: Simply run the application, .env file must be correctly setted up and postgres service must be running.
+- make test: Run all tests, a .test.env file must be created in similar format to 'example.test.env'.
+- make test-cover: Run all tests and generate a coverage.out.
