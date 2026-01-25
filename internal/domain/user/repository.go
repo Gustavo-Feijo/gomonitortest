@@ -11,6 +11,7 @@ type Repository interface {
 	Create(ctx context.Context, user *User) error
 	GetByID(ctx context.Context, id uint) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
+	WithTx(tx *gorm.DB) Repository
 }
 
 type repository struct {
@@ -19,6 +20,10 @@ type repository struct {
 
 func NewRepository(db *gorm.DB) Repository {
 	return &repository{db}
+}
+
+func (r *repository) WithTx(tx *gorm.DB) Repository {
+	return &repository{db: tx}
 }
 
 func (r *repository) Count(ctx context.Context) (int64, error) {

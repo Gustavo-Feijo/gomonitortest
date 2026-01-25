@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-func Run() error {
-	shutdownSignalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+func Run(ctx context.Context) error {
+	shutdownSignalCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	ctx, cancel := context.WithCancel(shutdownSignalCtx)

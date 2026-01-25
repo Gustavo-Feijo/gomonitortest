@@ -22,13 +22,13 @@ func bootstrapApp(ctx context.Context, container *container.Container) error {
 }
 
 // createAdminUser initializes the first user on the application as admin.
-func createAdminUser(ctx context.Context, db *gorm.DB, c *container.Container) error {
+func createAdminUser(ctx context.Context, tx *gorm.DB, c *container.Container) error {
 	logger := c.Deps.Logger
 	hasher := c.Deps.Hasher
 	cfg := c.Cfg.Admin
 
 	// Create new repository and service instead of using the container one due to the transactional nature.
-	userRepo := user.NewRepository(db)
+	userRepo := c.Repositories.User.WithTx(tx)
 
 	count, err := userRepo.Count(ctx)
 	if err != nil {

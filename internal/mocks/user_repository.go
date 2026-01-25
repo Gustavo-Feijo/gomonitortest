@@ -5,6 +5,7 @@ import (
 	"gomonitor/internal/domain/user"
 
 	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
 )
 
 type MockUserRepository struct {
@@ -41,4 +42,8 @@ func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*use
 	}
 
 	return u, args.Error(1)
+}
+
+func (m *MockUserRepository) WithTx(tx *gorm.DB) user.Repository {
+	return m
 }
