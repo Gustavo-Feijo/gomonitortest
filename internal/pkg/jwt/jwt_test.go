@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,24 +28,50 @@ func TestNewTokenManager(t *testing.T) {
 }
 
 func TestGenerateTokens(t *testing.T) {
+	type tokenTestResult struct {
+		Token     string
+		JTI       uuid.UUID
+		IssuedAt  time.Time
+		ExpiresAt time.Time
+	}
+
 	tests := []struct {
 		name      string
-		generate  func(pkgjwt.TokenManager) (string, error)
+		generate  func(pkgjwt.TokenManager) (tokenTestResult, error)
 		secret    string
 		tokenType pkgjwt.TokenType
 	}{
 		{
 			name: "access token",
-			generate: func(tm pkgjwt.TokenManager) (string, error) {
-				return tm.GenerateAccessToken(1, identity.RoleAdmin)
+			generate: func(tm pkgjwt.TokenManager) (tokenTestResult, error) {
+				res, err := tm.GenerateAccessToken(1, identity.RoleAdmin)
+				if err != nil {
+					return tokenTestResult{}, err
+				}
+
+				return tokenTestResult{
+					Token:     res.Token,
+					IssuedAt:  res.Meta.IssuedAt,
+					ExpiresAt: res.Meta.ExpiresAt,
+				}, nil
 			},
 			secret:    testConfig.AccessTokenSecret,
 			tokenType: pkgjwt.TokenTypeAccess,
 		},
 		{
 			name: "refresh token",
-			generate: func(tm pkgjwt.TokenManager) (string, error) {
-				return tm.GenerateRefreshToken(1, identity.RoleAdmin)
+			generate: func(tm pkgjwt.TokenManager) (tokenTestResult, error) {
+				res, err := tm.GenerateRefreshToken(1, identity.RoleAdmin)
+				if err != nil {
+					return tokenTestResult{}, err
+				}
+
+				return tokenTestResult{
+					Token:     res.Token,
+					JTI:       res.Meta.JTI,
+					IssuedAt:  res.Meta.IssuedAt,
+					ExpiresAt: res.Meta.ExpiresAt,
+				}, nil
 			},
 			secret:    testConfig.RefreshTokenSecret,
 			tokenType: pkgjwt.TokenTypeRefresh,
@@ -55,11 +82,15 @@ func TestGenerateTokens(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := pkgjwt.NewTokenManager(testConfig)
 
-			tokenStr, err := tt.generate(tm)
+			tokenTestResult, err := tt.generate(tm)
 			require.NoError(t, err)
 
+			if tt.tokenType == pkgjwt.TokenTypeRefresh {
+				assert.NotNil(t, tokenTestResult.JTI)
+			}
+
 			token, err := jwt.ParseWithClaims(
-				tokenStr,
+				tokenTestResult.Token,
 				&pkgjwt.CustomClaims{},
 				func(token *jwt.Token) (any, error) {
 					return []byte(tt.secret), nil
@@ -97,7 +128,7 @@ func TestValidateRefreshToken(t *testing.T) {
 			tokenGen: func() string {
 				tm := pkgjwt.NewTokenManager(testConfig)
 				token, _ := tm.GenerateAccessToken(1, identity.RoleUser)
-				return token
+				return token.Token
 			},
 			expectedErr: pkgjwt.ErrInvalidToken,
 		},
@@ -109,6 +140,7 @@ func TestValidateRefreshToken(t *testing.T) {
 					Type:   pkgjwt.TokenTypeRefresh,
 					UserID: 1,
 					Role:   identity.RoleAdmin,
+					JTI:    uuid.New().String(),
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(now.Add(testConfig.RefreshTokenTTL)),
 						IssuedAt:  jwt.NewNumericDate(now),
@@ -133,6 +165,7 @@ func TestValidateRefreshToken(t *testing.T) {
 					Type:   pkgjwt.TokenTypeAccess,
 					UserID: 1,
 					Role:   identity.RoleAdmin,
+					JTI:    uuid.New().String(),
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(now.Add(testConfig.RefreshTokenTTL)),
 						IssuedAt:  jwt.NewNumericDate(now),
@@ -153,6 +186,7 @@ func TestValidateRefreshToken(t *testing.T) {
 					Type:   pkgjwt.TokenTypeRefresh,
 					UserID: 1,
 					Role:   identity.RoleAdmin,
+					JTI:    uuid.New().String(),
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(now.Add(testConfig.RefreshTokenTTL)),
 						IssuedAt:  jwt.NewNumericDate(now),

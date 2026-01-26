@@ -17,5 +17,6 @@ type CustomClaims struct {
 	Type   TokenType `json:"typ"`
 	UserID uint      `json:"sub"`
 	Role   identity.UserRole
+	JTI    string `json:"jti,omitempty"`
 	jwt.RegisteredClaims
 }

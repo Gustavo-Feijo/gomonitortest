@@ -25,7 +25,7 @@ func TestNewService(t *testing.T) {
 	t.Parallel()
 	deps := &user.ServiceDeps{
 		Hasher:   password.NewPasswordHasher(bcrypt.DefaultCost),
-		UserRepo: user.NewRepository(&gorm.DB{}),
+		UserRepo: user.NewUserRepository(&gorm.DB{}),
 		Logger:   &slog.Logger{},
 	}
 

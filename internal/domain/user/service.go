@@ -22,13 +22,13 @@ type Service interface {
 type ServiceDeps struct {
 	Hasher   password.PasswordHasher
 	Logger   *slog.Logger
-	UserRepo Repository
+	UserRepo UserRepository
 }
 
 type service struct {
 	hasher   password.PasswordHasher
 	logger   *slog.Logger
-	userRepo Repository
+	userRepo UserRepository
 }
 
 func NewService(deps *ServiceDeps) Service {

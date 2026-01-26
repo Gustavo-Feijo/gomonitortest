@@ -44,6 +44,6 @@ func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*use
 	return u, args.Error(1)
 }
 
-func (m *MockUserRepository) WithTx(tx *gorm.DB) user.Repository {
+func (m *MockUserRepository) WithTx(tx *gorm.DB) user.UserRepository {
 	return m
 }

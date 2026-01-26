@@ -6,27 +6,27 @@ import (
 	"gorm.io/gorm"
 )
 
-type Repository interface {
+type UserRepository interface {
 	Count(ctx context.Context) (int64, error)
 	Create(ctx context.Context, user *User) error
 	GetByID(ctx context.Context, id uint) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
-	WithTx(tx *gorm.DB) Repository
+	WithTx(tx *gorm.DB) UserRepository
 }
 
-type repository struct {
+type userRepository struct {
 	db *gorm.DB
 }
 
-func NewRepository(db *gorm.DB) Repository {
-	return &repository{db}
+func NewUserRepository(db *gorm.DB) UserRepository {
+	return &userRepository{db}
 }
 
-func (r *repository) WithTx(tx *gorm.DB) Repository {
-	return &repository{db: tx}
+func (r *userRepository) WithTx(tx *gorm.DB) UserRepository {
+	return &userRepository{db: tx}
 }
 
-func (r *repository) Count(ctx context.Context) (int64, error) {
+func (r *userRepository) Count(ctx context.Context) (int64, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&User{}).Count(&count).Error
 	if err != nil {
@@ -35,11 +35,11 @@ func (r *repository) Count(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
-func (r *repository) Create(ctx context.Context, user *User) error {
+func (r *userRepository) Create(ctx context.Context, user *User) error {
 	return r.db.WithContext(ctx).Create(user).Error
 }
 
-func (r *repository) GetByID(ctx context.Context, id uint) (*User, error) {
+func (r *userRepository) GetByID(ctx context.Context, id uint) (*User, error) {
 	var user User
 	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (r *repository) GetByID(ctx context.Context, id uint) (*User, error) {
 	return &user, nil
 }
 
-func (r *repository) GetByEmail(ctx context.Context, email string) (*User, error) {
+func (r *userRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	var usr User
 	err := r.db.Model(&User{}).
 		Where("email = ?", email).

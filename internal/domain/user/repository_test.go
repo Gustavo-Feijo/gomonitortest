@@ -50,7 +50,7 @@ func TestRepository_Count(t *testing.T) {
 				tt.setupFunc(tx)
 			}
 
-			repository := user.NewRepository(tx)
+			repository := user.NewUserRepository(tx)
 
 			ctx := t.Context()
 			if tt.contextSetup != nil {
@@ -114,7 +114,7 @@ func TestRepository_Create(t *testing.T) {
 				tt.setupFunc(tx)
 			}
 
-			repo := user.NewRepository(tx)
+			repo := user.NewUserRepository(tx)
 
 			ctx := t.Context()
 			if tt.contextSetup != nil {
@@ -181,7 +181,7 @@ func TestRepository_GetByID(t *testing.T) {
 				}
 			}
 
-			repo := user.NewRepository(tx)
+			repo := user.NewUserRepository(tx)
 
 			ctx := t.Context()
 			if tt.contextSetup != nil {
@@ -247,7 +247,7 @@ func TestRepository_GetByEmail(t *testing.T) {
 				}
 			}
 
-			repo := user.NewRepository(tx)
+			repo := user.NewUserRepository(tx)
 
 			ctx := t.Context()
 			if tt.contextSetup != nil {

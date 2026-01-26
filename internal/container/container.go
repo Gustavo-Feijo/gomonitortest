@@ -19,7 +19,8 @@ type Container struct {
 }
 
 type Repositories struct {
-	User user.Repository
+	User         user.UserRepository
+	RefreshToken auth.RefreshTokenRepository
 }
 
 type Services struct {
@@ -41,14 +42,16 @@ func New(deps *deps.Deps, cfg *config.Config) *Container {
 		Handler:      &Handlers{},
 	}
 
-	c.Repositories.User = user.NewRepository(deps.DB)
+	c.Repositories.User = user.NewUserRepository(deps.DB)
+	c.Repositories.RefreshToken = auth.NewRefreshTokenRepository(deps.DB)
 
 	c.Services.Auth = auth.NewService(&auth.ServiceDeps{
-		AuthConfig:   cfg.Auth,
-		Hasher:       deps.Hasher,
-		Logger:       deps.Logger,
-		UserRepo:     c.Repositories.User,
-		TokenManager: deps.TokenManager,
+		AuthConfig:       cfg.Auth,
+		Hasher:           deps.Hasher,
+		Logger:           deps.Logger,
+		RefreshTokenRepo: c.Repositories.RefreshToken,
+		UserRepo:         c.Repositories.User,
+		TokenManager:     deps.TokenManager,
 	})
 
 	c.Services.User = user.NewService(&user.ServiceDeps{

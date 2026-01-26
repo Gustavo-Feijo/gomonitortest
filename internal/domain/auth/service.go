@@ -20,28 +20,31 @@ type Service interface {
 }
 
 type ServiceDeps struct {
-	AuthConfig   *config.AuthConfig
-	UserRepo     user.Repository
-	Logger       *slog.Logger
-	Hasher       password.PasswordHasher
-	TokenManager jwt.TokenManager
+	AuthConfig       *config.AuthConfig
+	RefreshTokenRepo RefreshTokenRepository
+	UserRepo         user.UserRepository
+	Logger           *slog.Logger
+	Hasher           password.PasswordHasher
+	TokenManager     jwt.TokenManager
 }
 
 type service struct {
-	authCfg      *config.AuthConfig
-	logger       *slog.Logger
-	hasher       password.PasswordHasher
-	userRepo     user.Repository
-	tokenManager jwt.TokenManager
+	authCfg          *config.AuthConfig
+	logger           *slog.Logger
+	hasher           password.PasswordHasher
+	refreshTokenRepo RefreshTokenRepository
+	userRepo         user.UserRepository
+	tokenManager     jwt.TokenManager
 }
 
 func NewService(deps *ServiceDeps) Service {
 	return &service{
-		authCfg:      deps.AuthConfig,
-		logger:       deps.Logger,
-		hasher:       deps.Hasher,
-		userRepo:     deps.UserRepo,
-		tokenManager: deps.TokenManager,
+		authCfg:          deps.AuthConfig,
+		logger:           deps.Logger,
+		hasher:           deps.Hasher,
+		refreshTokenRepo: deps.RefreshTokenRepo,
+		userRepo:         deps.UserRepo,
+		tokenManager:     deps.TokenManager,
 	}
 }
 
@@ -72,19 +75,31 @@ func (s *service) Login(ctx context.Context, input LoginInput) (*LoginOutput, er
 		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidCredentials)
 	}
 
-	refreshToken, err := s.tokenManager.GenerateRefreshToken(user.ID, user.Role)
+	refreshTokenResult, err := s.tokenManager.GenerateRefreshToken(user.ID, user.Role)
 	if err != nil {
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
-	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)
+	refreshTokenDb := &RefreshToken{
+		JTI:       refreshTokenResult.Meta.JTI,
+		UserID:    user.ID,
+		ExpiresAt: refreshTokenResult.Meta.ExpiresAt,
+		CreatedAt: refreshTokenResult.Meta.IssuedAt,
+	}
+
+	tokenStoreErr := s.refreshTokenRepo.Create(ctx, refreshTokenDb)
+	if tokenStoreErr != nil {
+		return nil, pkgerrors.NewInternalError(err)
+	}
+
+	accessTokenResult, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
 	return &LoginOutput{
-		RefreshToken: refreshToken,
-		AccessToken:  accessToken,
+		RefreshToken: refreshTokenResult.Token,
+		AccessToken:  accessTokenResult.Token,
 	}, nil
 }
 
@@ -106,12 +121,12 @@ func (s *service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutp
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
-	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)
+	accessTokenResult, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
 	return &RefreshOutput{
-		AccessToken: accessToken,
+		AccessToken: accessTokenResult.Token,
 	}, nil
 }

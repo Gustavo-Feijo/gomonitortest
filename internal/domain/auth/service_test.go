@@ -14,16 +14,29 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
+type loginMocks struct {
+	userRepo         *mocks.MockUserRepository
+	refreshTokenRepo *mocks.MockRefreshTokenRepository
+	hasher           *mocks.MockPasswordHasher
+	jwtManager       *mocks.MockJwtManager
+}
+
+type refreshMocks struct {
+	userRepo   *mocks.MockUserRepository
+	jwtManager *mocks.MockJwtManager
+}
+
 func TestNewService(t *testing.T) {
 	t.Parallel()
 	deps := &auth.ServiceDeps{
-		UserRepo:     user.NewRepository(&gorm.DB{}),
+		UserRepo:     user.NewUserRepository(&gorm.DB{}),
 		Logger:       &slog.Logger{},
 		TokenManager: jwt.NewTokenManager(&config.AuthConfig{}),
 		AuthConfig:   &config.AuthConfig{},
@@ -43,6 +56,7 @@ func TestService_Login(t *testing.T) {
 		Password: "password123",
 	}
 
+	defaultJti := uuid.New()
 	defaultUserReturn := &user.User{
 		ID:       1,
 		Name:     "test",
@@ -55,10 +69,24 @@ func TestService_Login(t *testing.T) {
 	fakeRefreshToken := "fakeRefresh"
 	fakeAccessToken := "fakeAccess"
 
+	fakeRefreshTokenResult := &jwt.RefreshTokenResult{
+		Token: fakeRefreshToken,
+		Meta: jwt.TokenMetadata{
+			JTI: defaultJti,
+		},
+	}
+
+	fakeAccessTokenResult := &jwt.AccessTokenResult{
+		Token: fakeAccessToken,
+		Meta: jwt.TokenMetadata{
+			JTI: defaultJti,
+		},
+	}
+
 	tests := []struct {
 		name       string
 		input      auth.LoginInput
-		setupMocks func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager)
+		setupMocks func(m *loginMocks)
 		expected   *auth.LoginOutput
 		assertErr  func(t *testing.T, err error)
 	}{
@@ -68,12 +96,12 @@ func TestService_Login(t *testing.T) {
 				Email:    "nonexistenttest@test.com",
 				Password: "password123",
 			},
-			setupMocks: func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager) {
-				repo.
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
 					On("GetByEmail", mock.Anything, "nonexistenttest@test.com").
 					Return(testutil.Err[*user.User](gorm.ErrRecordNotFound))
 
-				hasher.
+				m.hasher.
 					On("VerifyPassword", fakeHash, "password123").
 					Return(nil)
 			},
@@ -85,12 +113,12 @@ func TestService_Login(t *testing.T) {
 		{
 			name:  "db error",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager) {
-				repo.
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
 					On("GetByEmail", mock.Anything, "test@test.com").
 					Return(testutil.Err[*user.User](gorm.ErrInvalidDB))
 
-				hasher.
+				m.hasher.
 					On("VerifyPassword", fakeHash, "password123").
 					Return(nil)
 			},
@@ -102,12 +130,12 @@ func TestService_Login(t *testing.T) {
 		{
 			name:  "wrong password",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager) {
-				repo.
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
 					On("GetByEmail", mock.Anything, "test@test.com").
 					Return(testutil.Ok(defaultUserReturn))
 
-				hasher.
+				m.hasher.
 					On("VerifyPassword", fakeHash, "password123").
 					Return(bcrypt.ErrMismatchedHashAndPassword)
 			},
@@ -119,18 +147,43 @@ func TestService_Login(t *testing.T) {
 		{
 			name:  "refresh token error",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager) {
-				repo.
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
 					On("GetByEmail", mock.Anything, "test@test.com").
 					Return(testutil.Ok(defaultUserReturn))
 
-				hasher.
+				m.hasher.
 					On("VerifyPassword", defaultUserReturn.Password, "password123").
 					Return(nil)
 
-				jwtManager.
+				m.jwtManager.
 					On("GenerateRefreshToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return("", errors.New("signing error"))
+					Return(nil, errors.New("signing error"))
+			},
+			assertErr: func(t *testing.T, err error) {
+				var nf *pkgerrors.AppError
+				assert.ErrorAs(t, err, &nf)
+			},
+		},
+		{
+			name:  "refresh token store error",
+			input: defaultInput,
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
+					On("GetByEmail", mock.Anything, "test@test.com").
+					Return(testutil.Ok(defaultUserReturn))
+
+				m.hasher.
+					On("VerifyPassword", defaultUserReturn.Password, "password123").
+					Return(nil)
+
+				m.jwtManager.
+					On("GenerateRefreshToken", defaultUserReturn.ID, defaultUserReturn.Role).
+					Return(fakeRefreshTokenResult, nil)
+
+				m.refreshTokenRepo.
+					On("Create", mock.Anything, mock.Anything).
+					Return(errors.New("error"))
 			},
 			assertErr: func(t *testing.T, err error) {
 				var nf *pkgerrors.AppError
@@ -140,22 +193,26 @@ func TestService_Login(t *testing.T) {
 		{
 			name:  "access token error",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager) {
-				repo.
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
 					On("GetByEmail", mock.Anything, "test@test.com").
 					Return(testutil.Ok(defaultUserReturn))
 
-				hasher.
+				m.hasher.
 					On("VerifyPassword", defaultUserReturn.Password, "password123").
 					Return(nil)
 
-				jwtManager.
+				m.jwtManager.
 					On("GenerateRefreshToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return(fakeRefreshToken, nil)
+					Return(fakeRefreshTokenResult, nil)
 
-				jwtManager.
+				m.refreshTokenRepo.
+					On("Create", mock.Anything, mock.Anything).
+					Return(nil)
+
+				m.jwtManager.
 					On("GenerateAccessToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return("", errors.New("signing error"))
+					Return(nil, errors.New("signing error"))
 			},
 			assertErr: func(t *testing.T, err error) {
 				var nf *pkgerrors.AppError
@@ -165,22 +222,26 @@ func TestService_Login(t *testing.T) {
 		{
 			name:  "success",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, hasher *mocks.MockPasswordHasher, jwtManager *mocks.MockJwtManager) {
-				repo.
+			setupMocks: func(m *loginMocks) {
+				m.userRepo.
 					On("GetByEmail", mock.Anything, "test@test.com").
 					Return(testutil.Ok(defaultUserReturn))
 
-				hasher.
+				m.hasher.
 					On("VerifyPassword", defaultUserReturn.Password, "password123").
 					Return(nil)
 
-				jwtManager.
+				m.jwtManager.
 					On("GenerateRefreshToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return(fakeRefreshToken, nil)
+					Return(fakeRefreshTokenResult, nil)
 
-				jwtManager.
+				m.refreshTokenRepo.
+					On("Create", mock.Anything, mock.Anything).
+					Return(nil)
+
+				m.jwtManager.
 					On("GenerateAccessToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return(fakeAccessToken, nil)
+					Return(fakeAccessTokenResult, nil)
 			},
 			expected: &auth.LoginOutput{
 				RefreshToken: fakeRefreshToken,
@@ -191,20 +252,29 @@ func TestService_Login(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			repo := &mocks.MockUserRepository{}
+			userRepo := &mocks.MockUserRepository{}
+			refreshTokenRepo := &mocks.MockRefreshTokenRepository{}
 			hasher := &mocks.MockPasswordHasher{}
 			jwtManager := &mocks.MockJwtManager{}
-			tt.setupMocks(repo, hasher, jwtManager)
+
+			loginMocks := &loginMocks{
+				userRepo:         userRepo,
+				refreshTokenRepo: refreshTokenRepo,
+				hasher:           hasher,
+				jwtManager:       jwtManager,
+			}
+
+			tt.setupMocks(loginMocks)
 
 			svcDeps := &auth.ServiceDeps{
 				AuthConfig: &config.AuthConfig{
 					FakeHash: fakeHash,
 				},
-				Hasher:       hasher,
-				UserRepo:     repo,
-				Logger:       slog.Default(),
-				TokenManager: jwtManager,
+				Hasher:           hasher,
+				UserRepo:         userRepo,
+				Logger:           slog.Default(),
+				TokenManager:     jwtManager,
+				RefreshTokenRepo: refreshTokenRepo,
 			}
 			service := auth.NewService(svcDeps)
 
@@ -219,7 +289,7 @@ func TestService_Login(t *testing.T) {
 				assert.Equal(t, tt.expected, result)
 			}
 
-			repo.AssertExpectations(t)
+			userRepo.AssertExpectations(t)
 			hasher.AssertExpectations(t)
 			jwtManager.AssertExpectations(t)
 		})
@@ -252,11 +322,17 @@ func TestService_Refresh(t *testing.T) {
 	}
 
 	fakeAccessToken := "fakeAccess"
+	fakeAccessTokenResult := &jwt.AccessTokenResult{
+		Token: fakeAccessToken,
+		Meta: jwt.TokenMetadata{
+			JTI: uuid.UUID{},
+		},
+	}
 
 	tests := []struct {
 		name       string
 		input      auth.RefreshInput
-		setupMocks func(repo *mocks.MockUserRepository, jwtManager *mocks.MockJwtManager)
+		setupMocks func(m *refreshMocks)
 		expected   *auth.RefreshOutput
 		assertErr  func(t *testing.T, err error)
 	}{
@@ -265,8 +341,8 @@ func TestService_Refresh(t *testing.T) {
 			input: auth.RefreshInput{
 				RefreshToken: "badFakeRefresh",
 			},
-			setupMocks: func(repo *mocks.MockUserRepository, jwtManager *mocks.MockJwtManager) {
-				jwtManager.
+			setupMocks: func(m *refreshMocks) {
+				m.jwtManager.
 					On("ValidateRefreshToken", "badFakeRefresh").
 					Return(nil, errors.New("signing error"))
 			},
@@ -278,12 +354,12 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name:  "db error",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, jwtManager *mocks.MockJwtManager) {
-				jwtManager.
+			setupMocks: func(m *refreshMocks) {
+				m.jwtManager.
 					On("ValidateRefreshToken", fakeRefreshToken).
 					Return(testutil.Ok(defaultPrincipal))
 
-				repo.
+				m.userRepo.
 					On("GetByID", mock.Anything, defaultPrincipal.UserID).
 					Return(testutil.Err[*user.User](gorm.ErrInvalidDB))
 			},
@@ -297,8 +373,8 @@ func TestService_Refresh(t *testing.T) {
 			input: auth.RefreshInput{
 				RefreshToken: "fakeRefreshTokenNonExistentUser",
 			},
-			setupMocks: func(repo *mocks.MockUserRepository, jwtManager *mocks.MockJwtManager) {
-				jwtManager.
+			setupMocks: func(m *refreshMocks) {
+				m.jwtManager.
 					On("ValidateRefreshToken", "fakeRefreshTokenNonExistentUser").
 					Return(testutil.Ok(&identity.Principal{
 						UserID: 999,
@@ -306,7 +382,7 @@ func TestService_Refresh(t *testing.T) {
 						Source: identity.AuthExternal,
 					}))
 
-				repo.
+				m.userRepo.
 					On("GetByID", mock.Anything, uint(999)).
 					Return(testutil.Err[*user.User](gorm.ErrRecordNotFound))
 			},
@@ -318,18 +394,18 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name:  "access token error",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, jwtManager *mocks.MockJwtManager) {
-				jwtManager.
+			setupMocks: func(m *refreshMocks) {
+				m.jwtManager.
 					On("ValidateRefreshToken", fakeRefreshToken).
 					Return(testutil.Ok(defaultPrincipal))
 
-				repo.
+				m.userRepo.
 					On("GetByID", mock.Anything, defaultPrincipal.UserID).
 					Return(testutil.Ok(defaultUserReturn))
 
-				jwtManager.
+				m.jwtManager.
 					On("GenerateAccessToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return("", errors.New("signing error"))
+					Return(nil, errors.New("signing error"))
 			},
 			assertErr: func(t *testing.T, err error) {
 				var nf *pkgerrors.AppError
@@ -339,18 +415,18 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name:  "success",
 			input: defaultInput,
-			setupMocks: func(repo *mocks.MockUserRepository, jwtManager *mocks.MockJwtManager) {
-				jwtManager.
+			setupMocks: func(m *refreshMocks) {
+				m.jwtManager.
 					On("ValidateRefreshToken", fakeRefreshToken).
 					Return(testutil.Ok(defaultPrincipal))
 
-				repo.
+				m.userRepo.
 					On("GetByID", mock.Anything, defaultPrincipal.UserID).
 					Return(testutil.Ok(defaultUserReturn))
 
-				jwtManager.
+				m.jwtManager.
 					On("GenerateAccessToken", defaultUserReturn.ID, defaultUserReturn.Role).
-					Return(fakeAccessToken, nil)
+					Return(fakeAccessTokenResult, nil)
 			},
 			expected: &auth.RefreshOutput{
 				AccessToken: fakeAccessToken,
@@ -361,15 +437,20 @@ func TestService_Refresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			repo := &mocks.MockUserRepository{}
+			userRepo := &mocks.MockUserRepository{}
 			jwtManager := &mocks.MockJwtManager{}
-			tt.setupMocks(repo, jwtManager)
+
+			refreshMocks := &refreshMocks{
+				userRepo:   userRepo,
+				jwtManager: jwtManager,
+			}
+			tt.setupMocks(refreshMocks)
 
 			svcDeps := &auth.ServiceDeps{
 				AuthConfig: &config.AuthConfig{
 					FakeHash: fakeHash,
 				},
-				UserRepo:     repo,
+				UserRepo:     userRepo,
 				Logger:       slog.Default(),
 				TokenManager: jwtManager,
 			}
@@ -386,7 +467,7 @@ func TestService_Refresh(t *testing.T) {
 				assert.Equal(t, tt.expected, result)
 			}
 
-			repo.AssertExpectations(t)
+			userRepo.AssertExpectations(t)
 			jwtManager.AssertExpectations(t)
 		})
 	}
