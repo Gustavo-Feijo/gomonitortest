@@ -60,7 +60,7 @@ func New(deps *deps.Deps, cfg *config.Config) *Container {
 		Logger:   deps.Logger,
 	})
 
-	c.Handler.Auth = authhandler.NewHandler(deps.Logger, c.Services.Auth)
+	c.Handler.Auth = authhandler.NewHandler(deps.Logger, c.Services.Auth, deps.TokenManager)
 	c.Handler.User = userhandler.NewHandler(deps.Logger, c.Services.User, deps.TokenManager)
 
 	return c

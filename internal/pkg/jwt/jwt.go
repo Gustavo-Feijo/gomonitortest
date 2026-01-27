@@ -18,7 +18,7 @@ var (
 
 type TokenManager interface {
 	GenerateRefreshToken(userID uint, role identity.UserRole) (*RefreshTokenResult, error)
-	GenerateAccessToken(userID uint, role identity.UserRole) (*AccessTokenResult, error)
+	GenerateAccessToken(userID uint, role identity.UserRole, refreshTokenJTI uuid.UUID) (*AccessTokenResult, error)
 	ValidateRefreshToken(tokenString string) (*identity.Principal, error)
 	ValidateAccessToken(tokenString string) (*identity.Principal, error)
 }
@@ -52,7 +52,7 @@ type TokenMetadata struct {
 func (t *tokenManager) GenerateRefreshToken(userID uint, role identity.UserRole) (*RefreshTokenResult, error) {
 	now := time.Now()
 	expiresAt := now.Add(t.cfg.RefreshTokenTTL)
-	token, metadata, err := t.generateToken(userID, role, TokenTypeRefresh, expiresAt, now, t.cfg.RefreshTokenSecret)
+	token, metadata, err := t.generateToken(userID, role, TokenTypeRefresh, uuid.New(), expiresAt, now, t.cfg.RefreshTokenSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +63,10 @@ func (t *tokenManager) GenerateRefreshToken(userID uint, role identity.UserRole)
 	}, nil
 }
 
-func (t *tokenManager) GenerateAccessToken(userID uint, role identity.UserRole) (*AccessTokenResult, error) {
+func (t *tokenManager) GenerateAccessToken(userID uint, role identity.UserRole, refreshTokenJTI uuid.UUID) (*AccessTokenResult, error) {
 	now := time.Now()
 	expiresAt := now.Add(t.cfg.AccessTokenTTL)
-	token, metadata, err := t.generateToken(userID, role, TokenTypeAccess, expiresAt, now, t.cfg.AccessTokenSecret)
+	token, metadata, err := t.generateToken(userID, role, TokenTypeAccess, refreshTokenJTI, expiresAt, now, t.cfg.AccessTokenSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -81,27 +81,27 @@ func (t *tokenManager) generateToken(
 	userID uint,
 	role identity.UserRole,
 	tokenType TokenType,
+	jtiUUID uuid.UUID,
 	expiresAt time.Time,
 	issuedAt time.Time,
 	secret string,
 ) (string, TokenMetadata, error) {
-	var jtiUUID uuid.UUID
-	var jtiStr string
-
-	if tokenType == TokenTypeRefresh {
-		jtiUUID = uuid.New()
-		jtiStr = jtiUUID.String()
-	}
-
 	claims := CustomClaims{
 		Type:   tokenType,
 		UserID: userID,
 		Role:   role,
-		JTI:    jtiStr,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(issuedAt),
 		},
+	}
+
+	if tokenType == TokenTypeRefresh {
+		claims.JTI = jtiUUID.String()
+	}
+
+	if tokenType == TokenTypeAccess {
+		claims.RefreshJTI = jtiUUID.String()
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -142,9 +142,29 @@ func (t *tokenManager) validateToken(tokenString string, tokenType TokenType, se
 		return nil, ErrInvalidTokenType
 	}
 
+	var jti *uuid.UUID
+	if tokenType == TokenTypeRefresh {
+		parsed, err := uuid.Parse(claims.JTI)
+		if err != nil {
+			return nil, ErrInvalidToken
+		}
+		jti = &parsed
+	}
+
+	var refreshjti *uuid.UUID
+	if tokenType == TokenTypeAccess {
+		parsed, err := uuid.Parse(claims.RefreshJTI)
+		if err != nil {
+			return nil, ErrInvalidToken
+		}
+		refreshjti = &parsed
+	}
+
 	return &identity.Principal{
-		UserID: claims.UserID,
-		Role:   claims.Role,
-		Source: identity.AuthExternal,
+		UserID:     claims.UserID,
+		Role:       claims.Role,
+		Source:     identity.AuthExternal,
+		JTI:        jti,
+		RefreshJTI: refreshjti,
 	}, nil
 }

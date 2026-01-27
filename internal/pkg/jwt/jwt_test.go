@@ -44,7 +44,7 @@ func TestGenerateTokens(t *testing.T) {
 		{
 			name: "access token",
 			generate: func(tm pkgjwt.TokenManager) (tokenTestResult, error) {
-				res, err := tm.GenerateAccessToken(1, identity.RoleAdmin)
+				res, err := tm.GenerateAccessToken(1, identity.RoleAdmin, uuid.UUID{})
 				if err != nil {
 					return tokenTestResult{}, err
 				}
@@ -105,10 +105,12 @@ func TestGenerateTokens(t *testing.T) {
 }
 
 func TestValidateRefreshToken(t *testing.T) {
+	expectedJti := uuid.New()
 	expectedPrincipal := &identity.Principal{
 		UserID: 1,
 		Role:   identity.RoleAdmin,
 		Source: identity.AuthExternal,
+		JTI:    &expectedJti,
 	}
 
 	tests := []struct {
@@ -127,7 +129,7 @@ func TestValidateRefreshToken(t *testing.T) {
 			name: "wrong secret",
 			tokenGen: func() string {
 				tm := pkgjwt.NewTokenManager(testConfig)
-				token, _ := tm.GenerateAccessToken(1, identity.RoleUser)
+				token, _ := tm.GenerateAccessToken(1, identity.RoleUser, uuid.UUID{})
 				return token.Token
 			},
 			expectedErr: pkgjwt.ErrInvalidToken,
@@ -186,7 +188,7 @@ func TestValidateRefreshToken(t *testing.T) {
 					Type:   pkgjwt.TokenTypeRefresh,
 					UserID: 1,
 					Role:   identity.RoleAdmin,
-					JTI:    uuid.New().String(),
+					JTI:    expectedJti.String(),
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(now.Add(testConfig.RefreshTokenTTL)),
 						IssuedAt:  jwt.NewNumericDate(now),
@@ -219,10 +221,13 @@ func TestValidateRefreshToken(t *testing.T) {
 }
 
 func TestValidateAccessToken(t *testing.T) {
+	defaultJti := uuid.New()
+
 	expectedPrincipal := &identity.Principal{
-		UserID: 1,
-		Role:   identity.RoleAdmin,
-		Source: identity.AuthExternal,
+		UserID:     1,
+		Role:       identity.RoleAdmin,
+		Source:     identity.AuthExternal,
+		RefreshJTI: &defaultJti,
 	}
 
 	// Just success, logic always should be same as the refresh token generation, just changing type.
@@ -236,9 +241,10 @@ func TestValidateAccessToken(t *testing.T) {
 			tokenGen: func() string {
 				now := time.Now()
 				claims := pkgjwt.CustomClaims{
-					Type:   pkgjwt.TokenTypeAccess,
-					UserID: 1,
-					Role:   identity.RoleAdmin,
+					Type:       pkgjwt.TokenTypeAccess,
+					UserID:     1,
+					Role:       identity.RoleAdmin,
+					RefreshJTI: defaultJti.String(),
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(now.Add(testConfig.AccessTokenTTL)),
 						IssuedAt:  jwt.NewNumericDate(now),

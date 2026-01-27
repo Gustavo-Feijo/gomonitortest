@@ -28,3 +28,13 @@ func (m *MockAuthService) Refresh(ctx context.Context, input auth.RefreshInput) 
 	}
 	return ro, args.Error(1)
 }
+
+func (m *MockAuthService) Logout(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) LogoutAll(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}

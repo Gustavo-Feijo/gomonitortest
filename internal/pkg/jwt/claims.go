@@ -14,9 +14,10 @@ const (
 )
 
 type CustomClaims struct {
-	Type   TokenType `json:"typ"`
-	UserID uint      `json:"sub"`
-	Role   identity.UserRole
-	JTI    string `json:"jti,omitempty"`
+	Type       TokenType `json:"typ"`
+	UserID     uint      `json:"sub"`
+	Role       identity.UserRole
+	JTI        string `json:"jti,omitempty"`
+	RefreshJTI string `json:"refresh_jti,omitempty"`
 	jwt.RegisteredClaims
 }

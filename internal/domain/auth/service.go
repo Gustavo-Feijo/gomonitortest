@@ -7,15 +7,19 @@ import (
 	"gomonitor/internal/domain/user"
 	"gomonitor/internal/observability/logging"
 	pkgerrors "gomonitor/internal/pkg/errors"
+	"gomonitor/internal/pkg/identity"
 	"gomonitor/internal/pkg/jwt"
 	"gomonitor/internal/pkg/password"
 	"log/slog"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 type Service interface {
 	Login(ctx context.Context, input LoginInput) (*LoginOutput, error)
+	Logout(ctx context.Context) error
+	LogoutAll(ctx context.Context) error
 	Refresh(ctx context.Context, input RefreshInput) (*RefreshOutput, error)
 }
 
@@ -92,7 +96,7 @@ func (s *service) Login(ctx context.Context, input LoginInput) (*LoginOutput, er
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
-	accessTokenResult, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)
+	accessTokenResult, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role, refreshTokenResult.Meta.JTI)
 	if err != nil {
 		return nil, pkgerrors.NewInternalError(err)
 	}
@@ -101,6 +105,38 @@ func (s *service) Login(ctx context.Context, input LoginInput) (*LoginOutput, er
 		RefreshToken: refreshTokenResult.Token,
 		AccessToken:  accessTokenResult.Token,
 	}, nil
+}
+
+func (s *service) Logout(ctx context.Context) error {
+	principal, ok := identity.PrincipalFromContext(ctx)
+	if !ok {
+		logging.FromContext(ctx).Warn("unauthenticated user creation attempt")
+		return pkgerrors.NewUnauthorizedError("unauthenticated")
+	}
+
+	if principal.RefreshJTI == nil {
+		return pkgerrors.NewUnauthorizedError("refresh token reference required")
+	}
+
+	if err := s.refreshTokenRepo.RevokeByJTI(ctx, *principal.RefreshJTI); err != nil {
+		return pkgerrors.NewInternalError(err)
+	}
+
+	return nil
+}
+
+func (s *service) LogoutAll(ctx context.Context) error {
+	principal, ok := identity.PrincipalFromContext(ctx)
+	if !ok {
+		logging.FromContext(ctx).Warn("unauthenticated user creation attempt")
+		return pkgerrors.NewUnauthorizedError("unauthenticated")
+	}
+
+	if err := s.refreshTokenRepo.RevokeByUserID(ctx, principal.UserID); err != nil {
+		return pkgerrors.NewInternalError(err)
+	}
+
+	return nil
 }
 
 func (s *service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutput, error) {
@@ -113,6 +149,10 @@ func (s *service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutp
 		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
 	}
 
+	if token.JTI == nil {
+		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
+	}
+
 	user, err := s.userRepo.GetByID(ctx, token.UserID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -121,7 +161,24 @@ func (s *service) Refresh(ctx context.Context, input RefreshInput) (*RefreshOutp
 		return nil, pkgerrors.NewInternalError(err)
 	}
 
-	accessTokenResult, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role)
+	storedToken, err := s.refreshTokenRepo.GetByJTI(ctx, *token.JTI)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
+		}
+		return nil, pkgerrors.NewInternalError(err)
+	}
+
+	if storedToken.RevokedAt != nil {
+		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
+	}
+
+	// Checking again just to be sure.
+	if storedToken.ExpiresAt.Before(time.Now()) {
+		return nil, pkgerrors.NewUnauthorizedError(MsgInvalidToken)
+	}
+
+	accessTokenResult, err := s.tokenManager.GenerateAccessToken(user.ID, user.Role, *token.JTI)
 	if err != nil {
 		return nil, pkgerrors.NewInternalError(err)
 	}

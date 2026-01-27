@@ -14,7 +14,7 @@ import (
 )
 
 func TestHandler_NewHandler(t *testing.T) {
-	handler := authhandler.NewHandler(slog.Default(), &mocks.MockAuthService{})
+	handler := authhandler.NewHandler(slog.Default(), &mocks.MockAuthService{}, &mocks.MockJwtManager{})
 
 	assert.NotNil(t, handler)
 }
@@ -44,6 +44,13 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 			shouldExist:    true,
 		},
 		{
+			name:           "logout route exists",
+			method:         http.MethodPost,
+			path:           "/api/v1/auth/logout",
+			expectedStatus: http.StatusUnauthorized,
+			shouldExist:    true,
+		},
+		{
 			name:           "login only accepts POST",
 			method:         http.MethodGet,
 			path:           "/api/v1/auth/login",
@@ -53,7 +60,7 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 		{
 			name:           "non-existent route returns 404",
 			method:         http.MethodPost,
-			path:           "/api/v1/auth/logout",
+			path:           "/api/v1/auth/nonexistent",
 			expectedStatus: http.StatusNotFound,
 			shouldExist:    false,
 		},
@@ -62,7 +69,9 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockService := &mocks.MockAuthService{}
-			h := authhandler.NewHandler(slog.Default(), mockService)
+			mockJwtManager := &mocks.MockJwtManager{}
+
+			h := authhandler.NewHandler(slog.Default(), mockService, mockJwtManager)
 
 			gin.SetMode(gin.TestMode)
 			router := gin.New()

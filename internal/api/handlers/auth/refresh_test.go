@@ -85,9 +85,11 @@ func TestHandler_Refresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockService := &mocks.MockAuthService{}
+			mockJwtManager := &mocks.MockJwtManager{}
+
 			tt.setupMock(mockService)
 
-			h := authhandler.NewHandler(slog.Default(), mockService)
+			h := authhandler.NewHandler(slog.Default(), mockService, mockJwtManager)
 
 			router := gin.New()
 			router.HandleMethodNotAllowed = true

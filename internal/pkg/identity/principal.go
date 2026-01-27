@@ -1,6 +1,10 @@
 package identity
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 // External or internal authentication.
 type AuthSource string
@@ -14,6 +18,9 @@ type Principal struct {
 	UserID uint
 	Role   UserRole
 	Source AuthSource
+
+	JTI        *uuid.UUID // nil for access tokens
+	RefreshJTI *uuid.UUID
 }
 
 type principalKeyType struct{}

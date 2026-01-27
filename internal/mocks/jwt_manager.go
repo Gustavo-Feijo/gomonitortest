@@ -4,6 +4,7 @@ import (
 	"gomonitor/internal/pkg/identity"
 	"gomonitor/internal/pkg/jwt"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -20,7 +21,7 @@ func (m *MockJwtManager) GenerateRefreshToken(userID uint, role identity.UserRol
 	return j, args.Error(1)
 }
 
-func (m *MockJwtManager) GenerateAccessToken(userID uint, role identity.UserRole) (*jwt.AccessTokenResult, error) {
+func (m *MockJwtManager) GenerateAccessToken(userID uint, role identity.UserRole, refreshTokenJTI uuid.UUID) (*jwt.AccessTokenResult, error) {
 	args := m.Called(userID, role)
 	var j *jwt.AccessTokenResult
 	if args.Get(0) != nil {
