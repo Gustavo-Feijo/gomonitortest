@@ -50,8 +50,15 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, fu
 	engine := gin.New()
 	engine.HandleMethodNotAllowed = true
 
-	// Add middlewares.
 	engine.Use(gin.Recovery())
+
+	// Health check
+	engine.GET("/health", healthHandler)
+
+	// Prometheus metrics endpoint
+	engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// Add middlewares.
 	engine.Use(middlewares.TracingMiddleware(cfg))
 	engine.Use(middlewares.LoggingMiddleware(container.Deps.Logger))
 	engine.Use(middlewares.ErrorMiddleware())
@@ -69,16 +76,12 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, fu
 	}, depsCleanup, nil
 }
 
+func healthHandler(c *gin.Context) {
+	c.JSON(200, gin.H{"status": "ok"})
+}
+
 // registerRoutes defines the base API path and calls the  handlers.
 func registerRoutes(r *gin.Engine, handlers ...RouteRegister) {
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-
-	// Prometheus metrics endpoint
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-
 	api := r.Group("/api")
 
 	v1 := api.Group("/v1")

@@ -96,7 +96,8 @@ func TestRegisterRoutes_Health(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
-	registerRoutes(r)
+
+	r.GET("/health", healthHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
