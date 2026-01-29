@@ -55,6 +55,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, fu
 	engine.Use(middlewares.TracingMiddleware(cfg))
 	engine.Use(middlewares.LoggingMiddleware(container.Deps.Logger))
 	engine.Use(middlewares.ErrorMiddleware())
+	engine.Use(middlewares.IPRateLimiterMiddleware(container.RateLimiters.IPLimiter))
 	engine.Use(middlewares.PrometheusMiddleware())
 
 	userHandler := container.Handler.User

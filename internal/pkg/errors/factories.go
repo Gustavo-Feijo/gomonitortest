@@ -23,6 +23,10 @@ func NewConflictError(msg string, err ...error) *AppError {
 	return newAppError("CONFLICT", msg, http.StatusConflict, err...)
 }
 
+func NewTooManyRequestsError(msg string, err ...error) *AppError {
+	return newAppError("TOO_MANY_REQUEST", msg, http.StatusTooManyRequests, err...)
+}
+
 func NewInternalError(err ...error) *AppError {
 	return newAppError("INTERNAL_ERROR", "An unexpected error occurred", http.StatusInternalServerError, err...)
 }

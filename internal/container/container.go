@@ -7,15 +7,22 @@ import (
 	"gomonitor/internal/domain/auth"
 	"gomonitor/internal/domain/user"
 	"gomonitor/internal/infra/deps"
+	"gomonitor/internal/pkg/ratelimit"
+	"time"
 )
 
 type Container struct {
 	Deps *deps.Deps
 	Cfg  *config.Config
 
+	RateLimiters RateLimiters
 	Repositories *Repositories
 	Services     *Services
 	Handler      *Handlers
+}
+
+type RateLimiters struct {
+	IPLimiter ratelimit.RateLimiter
 }
 
 type Repositories struct {
@@ -41,6 +48,24 @@ func New(deps *deps.Deps, cfg *config.Config) *Container {
 		Services:     &Services{},
 		Handler:      &Handlers{},
 	}
+
+	c.RateLimiters.IPLimiter = ratelimit.New(
+		ratelimit.WithLimiter(
+			ratelimit.NewRedisLimiter(
+				deps.Redis,
+				ratelimit.WithLimit(10),
+				ratelimit.WithPrefix("rate_limit"),
+				ratelimit.WithWindow(time.Minute),
+			),
+		),
+		ratelimit.WithFallback(
+			ratelimit.NewMemoryLimiter(
+				ratelimit.WithLimit(5),
+				ratelimit.WithPrefix("rate_limit"),
+				ratelimit.WithWindow(time.Minute),
+			),
+		),
+	)
 
 	c.Repositories.User = user.NewUserRepository(deps.DB)
 	c.Repositories.RefreshToken = auth.NewRefreshTokenRepository(deps.DB)

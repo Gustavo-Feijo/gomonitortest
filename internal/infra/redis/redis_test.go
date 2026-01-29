@@ -117,3 +117,37 @@ func TestRedisGet(t *testing.T) {
 	assert.Equal(t, val, "5")
 	assert.Nil(t, err)
 }
+
+func TestRedisEval(t *testing.T) {
+	t.Parallel()
+
+	client := New(t.Context(), testRedisCfg, testCbCfg, slog.Default())
+
+	script := `
+		local val = redis.call("GET", KEYS[1])
+		if not val then
+			return nil
+		end
+		return val
+	`
+
+	res, err := client.Eval(
+		t.Context(),
+		script,
+		[]string{"nonexistent"},
+	)
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, redis.Nil)
+
+	_ = client.Set(t.Context(), "existent", 5, 0)
+
+	res, err = client.Eval(
+		t.Context(),
+		script,
+		[]string{"existent"},
+	)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "5", res)
+}

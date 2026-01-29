@@ -23,7 +23,7 @@ func Ptr[T any](v T) *T {
 }
 
 func GetCancelledCtx(ctx context.Context) context.Context {
-	canceledCtx, cancel := context.WithCancel(ctx)
+	cancelledCtx, cancel := context.WithCancel(ctx)
 	cancel()
-	return canceledCtx
+	return cancelledCtx
 }

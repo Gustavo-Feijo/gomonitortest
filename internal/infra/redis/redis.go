@@ -14,6 +14,7 @@ import (
 
 type RedisClient interface {
 	Close() error
+	Eval(ctx context.Context, script string, keys []string, args ...any) (any, error)
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 }
@@ -92,6 +93,18 @@ func (rs *redisClient) Get(ctx context.Context, key string) (string, error) {
 	}
 
 	return res.(string), nil
+}
+
+func (rs *redisClient) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	res, err := rs.cb.Execute(func() (any, error) {
+		return rs.client.Eval(ctx, script, keys, args...).Result()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 // Set wrapper with Circuit break and result unwrapping.

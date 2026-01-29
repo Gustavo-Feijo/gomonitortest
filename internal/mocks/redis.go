@@ -31,3 +31,8 @@ func (m *MockRedisClient) Set(ctx context.Context, key string, value any, ttl ti
 	args := m.Called(ctx, key, value, ttl)
 	return args.Error(0)
 }
+
+func (m *MockRedisClient) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	mockArgs := m.Called(ctx, script, keys, args)
+	return mockArgs.Get(0), mockArgs.Error(1)
+}

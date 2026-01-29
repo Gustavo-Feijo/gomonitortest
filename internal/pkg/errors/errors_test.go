@@ -121,6 +121,19 @@ func TestNewForbiddenError(t *testing.T) {
 	}
 }
 
+func TestNewTooManyRequestError(t *testing.T) {
+	t.Parallel()
+	err := pkgerrors.NewTooManyRequestsError("too many")
+
+	if err.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("expected status %d, got %d", http.StatusTooManyRequests, err.StatusCode)
+	}
+
+	if err.Code != "TOO_MANY_REQUEST" {
+		t.Errorf("expected code TOO_MANY_REQUEST, got %s", err.Code)
+	}
+}
+
 // Just so i can get my sweet 100% coverage
 func TestCallerFailureCoverage(t *testing.T) {
 	t.Parallel()
