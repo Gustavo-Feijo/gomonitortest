@@ -4,6 +4,7 @@ import (
 	"context"
 	"gomonitor/internal/container"
 	"gomonitor/internal/domain/user"
+	"gomonitor/internal/observability/logging"
 	"gomonitor/internal/pkg/identity"
 	"log/slog"
 
@@ -53,7 +54,8 @@ func createAdminUser(ctx context.Context, tx *gorm.DB, c *container.Container) e
 		Source: identity.AuthInternal,
 	}
 
-	internalCtx := identity.WithPrincipal(ctx, principal)
+	ctxWithLogging := logging.WithContext(ctx, logger)
+	internalCtx := identity.WithPrincipal(ctxWithLogging, principal)
 
 	var role = identity.RoleAdmin
 	adminUser := user.CreateUserInput{

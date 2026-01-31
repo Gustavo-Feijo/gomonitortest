@@ -7,6 +7,7 @@ import (
 	"gomonitor/internal/mocks"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -20,6 +21,13 @@ func TestNewContainer(t *testing.T) {
 		Redis:        &mocks.MockRedisClient{},
 		TokenManager: &mocks.MockJwtManager{},
 	}
-	container := container.New(deps, &config.Config{})
+	container := container.New(deps, &config.Config{
+		RateLimit: &config.RateLimitConfig{
+			IPLimit:    10,
+			IPWindow:   time.Minute,
+			UserLimit:  5,
+			UserWindow: time.Minute,
+		},
+	})
 	require.NotNil(t, container)
 }

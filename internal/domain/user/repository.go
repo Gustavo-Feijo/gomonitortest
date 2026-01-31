@@ -50,7 +50,9 @@ func (r *userRepository) GetByID(ctx context.Context, id uint) (*User, error) {
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	var usr User
-	err := r.db.Model(&User{}).
+	err := r.db.
+		WithContext(ctx).
+		Model(&User{}).
 		Where("email = ?", email).
 		First(&usr).Error
 

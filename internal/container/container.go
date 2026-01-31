@@ -8,7 +8,6 @@ import (
 	"gomonitor/internal/domain/user"
 	"gomonitor/internal/infra/deps"
 	"gomonitor/internal/pkg/ratelimit"
-	"time"
 )
 
 type Container struct {
@@ -53,16 +52,16 @@ func New(deps *deps.Deps, cfg *config.Config) *Container {
 		ratelimit.WithLimiter(
 			ratelimit.NewRedisLimiter(
 				deps.Redis,
-				ratelimit.WithLimit(10),
+				ratelimit.WithLimit(cfg.RateLimit.IPLimit),
 				ratelimit.WithPrefix("rate_limit"),
-				ratelimit.WithWindow(time.Minute),
+				ratelimit.WithWindow(cfg.RateLimit.IPWindow),
 			),
 		),
 		ratelimit.WithFallback(
 			ratelimit.NewMemoryLimiter(
-				ratelimit.WithLimit(5),
+				ratelimit.WithLimit(cfg.RateLimit.IPLimit),
 				ratelimit.WithPrefix("rate_limit"),
-				ratelimit.WithWindow(time.Minute),
+				ratelimit.WithWindow(cfg.RateLimit.IPWindow),
 			),
 		),
 	)

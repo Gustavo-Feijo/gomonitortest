@@ -18,6 +18,7 @@ type Config struct {
 	HTTP           *HTTPConfig
 	Logging        *LoggingConfig
 	ProjectRoot    string
+	RateLimit      *RateLimitConfig
 	Redis          *RedisConfig
 	Tracing        *TracingConfig
 }
@@ -38,6 +39,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	ratelimitConfig, err := getRateLimitConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Admin:          adminConfig,
 		Auth:           authConfig,
@@ -45,6 +51,7 @@ func Load() (*Config, error) {
 		Database:       getDatabaseConfig(),
 		HTTP:           getHTTPConfig(),
 		Logging:        getLoggingConfig(),
+		RateLimit:      ratelimitConfig,
 		Redis:          getRedisConfig(),
 		Tracing:        getTracingConfig(),
 	}, nil
