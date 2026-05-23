@@ -53,14 +53,14 @@ services:
         condition: service_healthy
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3
     volumes:
       - ./deployment/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
   
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.10.5
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./deployment/observability/tempo/tempo.yaml:/etc/tempo.yaml
@@ -72,7 +72,7 @@ services:
       - "4318:4318" # otlp http
       
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.7
     ports:
       - "3100:3100"
     command: ["-config.file=/etc/loki/local-config.yaml"]
@@ -81,7 +81,7 @@ services:
       - loki_data:/loki
       
   alloy:
-    image: grafana/alloy:latest
+    image: grafana/alloy:v1.16.1
     ports:
       - "12345:12345"   
       - "3500:3500"
@@ -115,7 +115,7 @@ services:
       - redis
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.0.1
     ports:
       - "3000:3000"
     volumes:
